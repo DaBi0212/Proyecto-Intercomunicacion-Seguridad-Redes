@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AetherPay Wallet</string>
+    <string name="title_activity_main">AetherPay Wallet</string>
+    <string name="package_name">mx.aetherpay.wallet</string>
+    <string name="custom_url_scheme">mx.aetherpay.wallet</string>
+</resources>

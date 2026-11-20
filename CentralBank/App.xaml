@@ -1,0 +1,174 @@
+<Application x:Class="CentralBank.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:CentralBank.Converters"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- Conversores de UI -->
+        <conv:TicketTierToBrushConverter x:Key="TicketTierBrushConv" />
+        <conv:HexToBrushConverter x:Key="HexToBrushConv" />
+        <conv:BoolToVisConverter x:Key="BoolToVisConv" />
+        <conv:TicketStatusToBgConverter x:Key="TicketStatusBgConv" />
+        <conv:TicketStatusToFgConverter x:Key="TicketStatusFgConv" />
+        <conv:TxTypeToBgConverter x:Key="TxTypeBgConv" />
+        <conv:TxTypeToFgConverter x:Key="TxTypeFgConv" />
+
+        <!-- ==========================================================================
+             TOKENS — Apple Human Interface Guidelines (1:1 con WalletPay & MarketStore)
+             ========================================================================== -->
+        <SolidColorBrush x:Key="BgPrimary" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="BgGrouped" Color="#F5F5F7" />
+        <SolidColorBrush x:Key="BgCell" Color="#F2F2F7" />
+        <SolidColorBrush x:Key="BgCardElevated" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="BgToolbar" Color="#F9F9FB" />
+        <SolidColorBrush x:Key="BgSheetCell" Color="#FFFFFF" />
+
+        <SolidColorBrush x:Key="TextPrimary" Color="#000000" />
+        <SolidColorBrush x:Key="TextSecondary" Color="#636366" />
+        <SolidColorBrush x:Key="TextTertiary" Color="#8E8E93" />
+
+        <SolidColorBrush x:Key="IosFill" Color="#1F787880" />
+        <SolidColorBrush x:Key="IosFill2" Color="#2E787880" />
+        <SolidColorBrush x:Key="IosSeparator" Color="#283C3C43" />
+
+        <!-- Colores de sistema iOS -->
+        <SolidColorBrush x:Key="IosBlue" Color="#007AFF" />
+        <SolidColorBrush x:Key="IosGreen" Color="#34C759" />
+        <SolidColorBrush x:Key="IosRed" Color="#FF3B30" />
+        <SolidColorBrush x:Key="IosAmber" Color="#FF9500" />
+        <SolidColorBrush x:Key="IosPurple" Color="#7C3AED" />
+        <SolidColorBrush x:Key="IosIndigo" Color="#5856D6" />
+
+        <!-- Fondos suaves traslúcidos de KPIs -->
+        <SolidColorBrush x:Key="SoftBlue" Color="#22007AFF" />
+        <SolidColorBrush x:Key="SoftGreen" Color="#2234C759" />
+        <SolidColorBrush x:Key="SoftPurple" Color="#227C3AED" />
+        <SolidColorBrush x:Key="SoftAmber" Color="#22FF9500" />
+        <SolidColorBrush x:Key="SoftRed" Color="#22FF3B30" />
+
+        <!-- Botón de acción primario estilo iOS -->
+        <Style x:Key="ApplePrimaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource IosBlue}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="11"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.91" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.80" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Botón secundario / Píldora estilo iOS -->
+        <Style x:Key="AppleSecondaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource IosFill}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Padding" Value="13,7" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Botón de Segmented Control estilo iOS -->
+        <Style x:Key="IosSegmentBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8.5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Caja de texto estilo iOS -->
+        <Style x:Key="IosTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource BgCell}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource IosBlue}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource IosSeparator}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource IosBlue}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Application.Resources>
+</Application>

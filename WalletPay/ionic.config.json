@@ -1,0 +1,8 @@
+{
+  "name": "AetherPay Wallet",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
+

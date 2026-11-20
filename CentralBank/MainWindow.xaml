@@ -1,0 +1,1414 @@
+<Window x:Class="CentralBank.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="CentralBank · Consola Maestra de Administración (SQLite + API en Tiempo Real)"
+        Width="1420"
+        Height="900"
+        MinWidth="1140"
+        MinHeight="740"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BgGrouped}"
+        Foreground="{DynamicResource TextPrimary}"
+        FontFamily="Segoe UI Variable Display, SF Pro Display, Segoe UI">
+
+    <Grid>
+        <!-- ==========================================================================
+             CAPA PRINCIPAL DEL DASHBOARD DE ADMINISTRADOR
+             ========================================================================== -->
+        <Grid x:Name="MainDashboardGrid">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- BARRA SUPERIOR TRANSLÚCIDA ESTILO APPLE HIG + DYNAMIC ISLAND HUD -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource BgToolbar}"
+                    BorderBrush="{DynamicResource IosSeparator}"
+                    BorderThickness="0,0,0,1"
+                    Padding="24,12">
+                <StackPanel>
+                    <!-- Fila 1: Identidad del Banco Central + Dynamic Island HUD + Acciones Rápidas -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Identidad del Banco Central -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource IosBlue}" Margin="0,0,12,0">
+                                <Viewbox Width="20" Height="20">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Data="M3 9.5L12 4L21 9.5Z" Stroke="White" StrokeThickness="2" StrokeLineJoin="Round" />
+                                        <Path Data="M5.5 11V18 M10 11V18 M14 11V18 M18.5 11V18 M3 20.5H21" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                    </Canvas>
+                                </Viewbox>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Banco Central" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                    <Border Background="{DynamicResource SoftGreen}" CornerRadius="6" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="SQLITE + API :5050 ACTIVA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Conectado en tiempo real en red local (0.0.0.0:5050) con WalletPay y MarketStore"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Dynamic Island Pill centrada sin sobreponerse -->
+                        <Border x:Name="DynamicIslandBorder"
+                                Grid.Column="1"
+                                Background="#1C1C1E"
+                                CornerRadius="18"
+                                Padding="16,7"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse x:Name="HudPulseDot" Width="8" Height="8" Fill="#30D158" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="HudStatusText"
+                                           Text="SQLite Activo · Escuchando WalletPay y MarketStore"
+                                           Foreground="White"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Acciones Rápidas del Administrador -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource AppleSecondaryBtn}"
+                                    Click="OnExportCsvClick"
+                                    Margin="0,0,8,0"
+                                    Content="Exportar CSV"
+                                    ToolTip="Exportar historial completo y balance de capital a CSV" />
+
+                            <Button Style="{StaticResource AppleSecondaryBtn}"
+                                    Click="OnClearDatabaseClick"
+                                    Margin="0,0,8,0"
+                                    Content="Limpiar BD"
+                                    ToolTip="Vaciar base de datos SQLite a cero" />
+
+                            <Button x:Name="ThemeToggleBtn"
+                                    Style="{StaticResource AppleSecondaryBtn}"
+                                    Click="OnToggleThemeClick"
+                                    Margin="0,0,8,0"
+                                    Content="Modo Oscuro"
+                                    ToolTip="Alternar apariencia Claro / Oscuro (Consistencia iOS HIG)" />
+
+                            <Button Style="{StaticResource AppleSecondaryBtn}"
+                                    Click="OnLockSessionClick"
+                                    Content="Bloquear"
+                                    ToolTip="Bloquear consola de administrador" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Fila 2: Segmented Control de Vistas Principales (Alineado de extremo a extremo sin sobreposición) -->
+                    <Border Background="{DynamicResource IosFill}"
+                            CornerRadius="12"
+                            Padding="4"
+                            Margin="0,12,0,0"
+                            HorizontalAlignment="Stretch">
+                        <UniformGrid Columns="5">
+                            <Button x:Name="TabBtnTransactions"
+                                    Style="{StaticResource IosSegmentBtn}"
+                                    Click="OnMainTabTransactionsClick"
+                                    Content="Historial de Transacciones (0)" />
+                            <Button x:Name="TabBtnApprovals"
+                                    Style="{StaticResource IosSegmentBtn}"
+                                    Click="OnMainTabApprovalsClick"
+                                    Content="Aprobar Compras Tienda (0)" />
+                            <Button x:Name="TabBtnTickets"
+                                    Style="{StaticResource IosSegmentBtn}"
+                                    Click="OnMainTabTicketsClick"
+                                    Content="Tickets (0 Sin Usar · 0 Usados)" />
+                            <Button x:Name="TabBtnCapital"
+                                    Style="{StaticResource IosSegmentBtn}"
+                                    Click="OnMainTabCapitalClick"
+                                    Content="Capital y Usuarios" />
+                            <Button x:Name="TabBtnAuditor"
+                                    Style="{StaticResource IosSegmentBtn}"
+                                    Click="OnMainTabAuditorClick"
+                                    Content="Auditor de Tickets" />
+                        </UniformGrid>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- CONTENIDO DESPLAZABLE DEL DASHBOARD -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="26,20,26,32" MaxWidth="1360">
+
+                    <!-- ==========================================================================
+                         ALERTA EN VIVO DE SOLICITUD DE COMPRA PENDIENTE DESDE MARKETSTORE
+                         ========================================================================== -->
+                    <Border x:Name="LivePendingOrdersAlertBanner"
+                            Visibility="Collapsed"
+                            Background="#24FF9500"
+                            BorderBrush="#FF9500"
+                            BorderThickness="1.5"
+                            CornerRadius="18"
+                            Padding="20,16"
+                            Margin="0,0,0,18">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="SOLICITUD DE COMPRA EN TIEMPO REAL DESDE MARKETSTORE"
+                                           FontSize="10.5"
+                                           FontWeight="Bold"
+                                           Foreground="#D97706" />
+                                <TextBlock x:Name="LivePendingAlertTitle"
+                                           Text="Hay 1 compra pendiente de verificación de tickets y aprobación bancaria"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,2,0,2" />
+                                <TextBlock Text="Verifica la autenticidad de los tickets presentados por el cliente y aprueba la orden para liberar su compra en MarketStore."
+                                           FontSize="12.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource ApplePrimaryBtn}"
+                                    Background="#EA580C"
+                                    Click="OnMainTabApprovalsClick"
+                                    Content="Revisar, Verificar Tickets y Aprobar Compra"
+                                    VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- ==========================================================================
+                         SECCIÓN 1: WIDGETS KPI FINANCIEROS EN TIEMPO REAL (DESDE SQLITE)
+                         ========================================================================== -->
+                    <UniformGrid Columns="4" Margin="0,0,0,20">
+                        <!-- KPI 1: CAPITAL TOTAL OBTENIDO DE VENTA DE TICKETS -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="18,16"
+                                Margin="0,0,12,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SoftGreen}" HorizontalAlignment="Left">
+                                        <Viewbox Width="18" Height="18">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M3 9.5L12 4L21 9.5Z M5.5 11V18 M10 11V18 M14 11V18 M18.5 11V18 M3 20.5H21"
+                                                      Stroke="#34C759" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
+                                    <Border Background="{DynamicResource SoftGreen}" CornerRadius="8" Padding="8,3" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Text="CAPITAL TOTAL VENTA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="Capital Total Obtenido" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" />
+                                <TextBlock x:Name="KpiTotalCapitalValue"
+                                           Text="$0.00 MXN"
+                                           FontSize="26"
+                                           FontWeight="Bold"
+                                           Foreground="#28B44B"
+                                           Margin="0,3,0,4" />
+                                <TextBlock x:Name="KpiTotalCapitalSub"
+                                           Text="0 tickets vendidos en WalletPay"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- KPI 2: TICKETS COMPRADOS PERO AÚN NO USADOS (EN CIRCULACIÓN) -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="18,16"
+                                Margin="0,0,12,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SoftBlue}" HorizontalAlignment="Left">
+                                        <Viewbox Width="18" Height="18">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M4 5.5H20V9A2.5 2.5 0 0 0 20 14V17.5H4V14A2.5 2.5 0 0 0 4 9Z M14.5 6V18"
+                                                      Stroke="#007AFF" StrokeThickness="2" StrokeLineJoin="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
+                                    <Border Background="{DynamicResource SoftBlue}" CornerRadius="8" Padding="8,3" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Text="COMPRADOS · SIN USAR" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource IosBlue}" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="Tickets Activos (Aún Sin Usar)" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" />
+                                <TextBlock x:Name="KpiUnusedTicketsValue"
+                                           Text="0 Tickets ($0)"
+                                           FontSize="25"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,3,0,4" />
+                                <TextBlock x:Name="KpiUnusedTicketsSub"
+                                           Text="Comprados en WalletPay pendientes de uso"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- KPI 3: TICKETS YA USADOS / CANJEADOS EN MARKETSTORE -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="18,16"
+                                Margin="0,0,12,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SoftPurple}" HorizontalAlignment="Left">
+                                        <Viewbox Width="18" Height="18">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M12 2.8L19.5 5.7V11.6C19.5 16.2 16.3 20 12 21.2C7.7 20 4.5 16.2 4.5 11.6V5.7Z M8.7 12L11 14.3L15.4 9.5"
+                                                      Stroke="#7C3AED" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
+                                    <Border Background="{DynamicResource SoftPurple}" CornerRadius="8" Padding="8,3" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Text="YA USADOS · LIQUIDADOS" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource IosPurple}" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="Tickets Ya Usados (Canjeados)" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" />
+                                <TextBlock x:Name="KpiUsedTicketsValue"
+                                           Text="0 Tickets ($0)"
+                                           FontSize="25"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,3,0,4" />
+                                <TextBlock x:Name="KpiUsedTicketsSub"
+                                           Text="Verificados y aprobados en MarketStore"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- KPI 4: SOLICITUDES DE COMPRA Y USUARIOS -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="18,16">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SoftAmber}" HorizontalAlignment="Left">
+                                        <Viewbox Width="18" Height="18">
+                                            <Canvas Width="24" Height="24">
+                                                <Ellipse Canvas.Left="2.5" Canvas.Top="2.5" Width="19" Height="19" Stroke="#FF9500" StrokeThickness="2" />
+                                                <Ellipse Canvas.Left="8.8" Canvas.Top="6.8" Width="6.4" Height="6.4" Stroke="#FF9500" StrokeThickness="2" />
+                                                <Path Data="M6.3 18.2C7.6 16.2 9.7 15.2 12 15.2C14.3 15.2 16.4 16.2 17.7 18.2" Stroke="#FF9500" StrokeThickness="2" StrokeStartLineCap="Round" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
+                                    <Border Background="{DynamicResource SoftAmber}" CornerRadius="8" Padding="8,3" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Text="FLUJO EN TIEMPO REAL" FontSize="10" FontWeight="Bold" Foreground="#EA580C" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="Usuarios y Compras Tienda" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" />
+                                <TextBlock x:Name="KpiUsersAndTxValue"
+                                           Text="0 Usuarios · 0 Pendientes"
+                                           FontSize="23"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,3,0,4" />
+                                <TextBlock x:Name="KpiUsersAndTxSub"
+                                           Text="Base de datos SQLite sincronizada"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <!-- ==========================================================================
+                         VISTA 1: HISTORIAL DE TRANSACCIONES POR USUARIO, MONTO Y HORA
+                         ========================================================================== -->
+                    <StackPanel x:Name="ViewTransactionsPanel" Visibility="Visible">
+
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="20,18"
+                                Margin="0,0,0,16">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="LIBRO MAYOR SQLITE · TRANSACCIONES EN TIEMPO REAL DESDE WALLETPAY Y MARKETSTORE"
+                                                   FontSize="10.5"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource IosBlue}" />
+                                        <TextBlock Text="Historial de Transacciones por Usuario, Monto y Hora"
+                                                   FontSize="21"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   Margin="0,2,0,2" />
+                                        <TextBlock Text="Cada vez que un usuario compra tickets en WalletPay o se aprueba su compra en MarketStore, el movimiento se registra aquí automáticamente."
+                                                   FontSize="12.5"
+                                                   Foreground="{DynamicResource TextSecondary}" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="1" Background="{DynamicResource IosFill}" CornerRadius="10" Padding="3" VerticalAlignment="Top">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button x:Name="FilterTxAllBtn"
+                                                    Style="{StaticResource IosSegmentBtn}"
+                                                    Click="OnFilterTxTypeClick"
+                                                    Tag="ALL"
+                                                    Content="Todas" />
+                                            <Button x:Name="FilterTxBuyBtn"
+                                                    Style="{StaticResource IosSegmentBtn}"
+                                                    Click="OnFilterTxTypeClick"
+                                                    Tag="BUY"
+                                                    Content="Compras de Tickets" />
+                                            <Button x:Name="FilterTxRedeemBtn"
+                                                    Style="{StaticResource IosSegmentBtn}"
+                                                    Click="OnFilterTxTypeClick"
+                                                    Tag="REDEEM"
+                                                    Content="Compras Aprobadas en Tienda" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Píldoras de Filtrado por Usuario -->
+                                <TextBlock Text="FILTRAR POR USUARIO:"
+                                           FontSize="11"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           Margin="0,0,0,8" />
+                                <WrapPanel x:Name="UserFilterPillsPanel" Margin="0,0,0,14" />
+
+                                <!-- Tarjeta de Resumen del Usuario Seleccionado -->
+                                <Border x:Name="SelectedUserSummaryCard"
+                                        Visibility="Collapsed"
+                                        Background="{DynamicResource BgCell}"
+                                        CornerRadius="14"
+                                        Padding="16,12"
+                                        Margin="0,0,0,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border x:Name="SelUserAvatarBorder" Width="42" Height="42" CornerRadius="21" Background="#007AFF" Margin="0,0,12,0">
+                                                <TextBlock x:Name="SelUserInitialsText" Text="AM" Foreground="White" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock x:Name="SelUserNameText" Text="Usuario" FontSize="15.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                <TextBlock x:Name="SelUserEmailText" Text="correo@marketstore.mx" FontSize="12" Foreground="{DynamicResource TextSecondary}" />
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Background="{DynamicResource BgCardElevated}" CornerRadius="10" Padding="12,7" Margin="0,0,8,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="CAPITAL COMPRADO" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" />
+                                                    <TextBlock x:Name="SelUserTotalBoughtText" Text="$0.00 MXN" FontSize="14.5" FontWeight="Bold" Foreground="#28B44B" />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Background="{DynamicResource BgCardElevated}" CornerRadius="10" Padding="12,7" Margin="0,0,8,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="TICKETS SIN USAR" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" />
+                                                    <TextBlock x:Name="SelUserUnusedText" Text="0 ($0 MXN)" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource IosBlue}" />
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Background="{DynamicResource BgCardElevated}" CornerRadius="10" Padding="12,7">
+                                                <StackPanel>
+                                                    <TextBlock Text="TICKETS YA USADOS" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" />
+                                                    <TextBlock x:Name="SelUserUsedText" Text="0 ($0 MXN)" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource IosPurple}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Barra de Búsqueda, Filtro de Estado del Ticket y Denominación -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBox x:Name="TxSearchBox"
+                                             Grid.Column="0"
+                                             Style="{StaticResource IosTextBox}"
+                                             TextChanged="OnTxSearchTextChanged"
+                                             Margin="0,0,12,0" />
+
+                                    <Border Grid.Column="1" Background="{DynamicResource IosFill}" CornerRadius="10" Padding="3" Margin="0,0,10,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button x:Name="FilterTxTicketAllBtn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterTxTicketStateClick" Tag="ALL" Content="Estado: Todos" />
+                                            <Button x:Name="FilterTxTicketUnusedBtn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterTxTicketStateClick" Tag="UNUSED" Content="Aún Sin Usar" />
+                                            <Button x:Name="FilterTxTicketUsedBtn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterTxTicketStateClick" Tag="USED" Content="Ya Usados" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="2" Background="{DynamicResource IosFill}" CornerRadius="10" Padding="3">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button x:Name="FilterDenomAllBtn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterDenomClick" Tag="0" Content="Todas ($)" />
+                                            <Button x:Name="FilterDenom50Btn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterDenomClick" Tag="50" Content="$50" />
+                                            <Button x:Name="FilterDenom100Btn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterDenomClick" Tag="100" Content="$100" />
+                                            <Button x:Name="FilterDenom200Btn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterDenomClick" Tag="200" Content="$200" />
+                                            <Button x:Name="FilterDenom500Btn" Style="{StaticResource IosSegmentBtn}" Click="OnFilterDenomClick" Tag="500" Content="$500" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Lista Inset de Transacciones o Estado Vacío -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="18,14">
+                            <StackPanel>
+                                <Grid Margin="4,0,4,12">
+                                    <TextBlock x:Name="TxListHeaderCountText"
+                                               Text="MOSTRANDO 0 TRANSACCIONES REGISTRADAS"
+                                               FontSize="11.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock x:Name="TxListHeaderSumText"
+                                               Text="Capital en compras: $0.00 MXN"
+                                               FontSize="12.5"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+
+                                <!-- Estado vacío cuando aún no se han comprado tickets en WalletPay -->
+                                <Border x:Name="EmptyTransactionsState"
+                                        Background="{DynamicResource BgCell}"
+                                        CornerRadius="14"
+                                        Padding="32,36"
+                                        Visibility="Visible">
+                                    <StackPanel HorizontalAlignment="Center" MaxWidth="540">
+                                        <TextBlock Text="Sin transacciones registradas aún"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,6" />
+                                        <TextBlock Text="1. Abre la aplicación móvil WalletPay e inicia sesión.&#x0a;2. Compra uno o varios tickets ($50, $100, $200 o $500 MXN).&#x0a;3. Las transacciones aparecerán aquí en tiempo real con el usuario, monto y hora exacta de compra."
+                                                   FontSize="13"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <ItemsControl x:Name="TransactionsItemsControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource BgCell}"
+                                                    CornerRadius="14"
+                                                    Padding="16,13"
+                                                    Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="230" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="220" />
+                                                        <ColumnDefinition Width="220" />
+                                                        <ColumnDefinition Width="150" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- Columna 1: Usuario -->
+                                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Border Width="38" Height="38" CornerRadius="19"
+                                                                Background="{Binding UserAvatarHex, Converter={StaticResource HexToBrushConv}}"
+                                                                Margin="0,0,11,0">
+                                                            <TextBlock Text="{Binding UserInitials}"
+                                                                       Foreground="White"
+                                                                       FontWeight="Bold"
+                                                                       FontSize="13.5"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding UserName}"
+                                                                       FontSize="14"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{DynamicResource TextPrimary}" />
+                                                            <TextBlock Text="{Binding UserEmail}"
+                                                                       FontSize="11.5"
+                                                                       Foreground="{DynamicResource TextSecondary}" />
+                                                            <TextBlock Text="{Binding UserId}"
+                                                                       FontFamily="Consolas"
+                                                                       FontSize="10.5"
+                                                                       Foreground="{DynamicResource TextTertiary}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+
+                                                    <!-- Columna 2: Detalle de la Compra / Canje -->
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,12,0">
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                            <Border Background="{Binding Type, Converter={StaticResource TxTypeBgConv}}"
+                                                                    CornerRadius="6"
+                                                                    Padding="7,2"
+                                                                    Margin="0,0,8,0">
+                                                                <TextBlock Text="{Binding TypeBadgeText}"
+                                                                           Foreground="{Binding Type, Converter={StaticResource TxTypeFgConv}}"
+                                                                           FontSize="10"
+                                                                           FontWeight="Bold" />
+                                                            </Border>
+                                                            <Border Background="{DynamicResource BgCardElevated}"
+                                                                    CornerRadius="6"
+                                                                    Padding="7,2"
+                                                                    Margin="0,0,6,0">
+                                                                <TextBlock Text="{Binding TicketId}"
+                                                                           FontFamily="Consolas"
+                                                                           FontSize="11.5"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{DynamicResource TextPrimary}" />
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Id}"
+                                                                       FontFamily="Consolas"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource TextTertiary}"
+                                                                       VerticalAlignment="Center" />
+                                                        </StackPanel>
+
+                                                        <TextBlock Text="{Binding OperationTitle}"
+                                                                   FontSize="14.5"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextPrimary}" />
+                                                        <TextBlock Text="{Binding PaymentOrChannel}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextSecondary}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Margin="0,1,0,0" />
+                                                    </StackPanel>
+
+                                                    <!-- Columna 3: Fecha y Hora Exacta -->
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="6,0">
+                                                        <TextBlock Text="FECHA Y HORA DE COMPRA"
+                                                                   FontSize="10"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding TimeLabel}"
+                                                                   FontSize="14.5"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextPrimary}"
+                                                                   Margin="0,2,0,1" />
+                                                        <TextBlock Text="{Binding DateLabel}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextSecondary}" />
+                                                    </StackPanel>
+
+                                                    <!-- Columna 4: Estado Actual del Ticket -->
+                                                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="6,0">
+                                                        <TextBlock Text="ESTADO DEL TICKET"
+                                                                   FontSize="10"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextTertiary}"
+                                                                   Margin="0,0,0,4" />
+                                                        <Border Background="{Binding CurrentTicketStatus, Converter={StaticResource TicketStatusBgConv}}"
+                                                                CornerRadius="8"
+                                                                Padding="9,4"
+                                                                HorizontalAlignment="Left">
+                                                            <TextBlock Text="{Binding TicketStateBadge}"
+                                                                       Foreground="{Binding CurrentTicketStatus, Converter={StaticResource TicketStatusFgConv}}"
+                                                                       FontSize="10.5"
+                                                                       FontWeight="Bold" />
+                                                        </Border>
+                                                    </StackPanel>
+
+                                                    <!-- Columna 5: Monto y Auditoría -->
+                                                    <StackPanel Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding AmountFormatted}"
+                                                                   FontSize="16.5"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{Binding Type, Converter={StaticResource TxTypeFgConv}}"
+                                                                   HorizontalAlignment="Right"
+                                                                   Margin="0,0,0,6" />
+                                                        <Button Style="{StaticResource AppleSecondaryBtn}"
+                                                                Padding="10,4"
+                                                                FontSize="11"
+                                                                HorizontalAlignment="Right"
+                                                                Tag="{Binding TicketId}"
+                                                                Click="OnAuditTicketFromRowClick"
+                                                                Content="Auditar Ticket" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==========================================================================
+                         VISTA 2: VERIFICACIÓN DE AUTENTICIDAD Y APROBACIÓN DE COMPRAS DE MARKETSTORE
+                         ========================================================================== -->
+                    <StackPanel x:Name="ViewApprovalsPanel" Visibility="Collapsed">
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="22,18"
+                                Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="CENTRO DE AUTORIZACIÓN BANCARIA · CONEXIÓN EN VIVO CON MARKETSTORE"
+                                           FontSize="10.5"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource IosBlue}" />
+                                <TextBlock Text="Verificación de Autenticidad de Tickets y Aprobación de Compras"
+                                           FontSize="21"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,2,0,4" />
+                                <TextBlock Text="Cuando el usuario selecciona productos en MarketStore y solicita pagar con sus tickets de WalletPay, la orden llega aquí para que verifiques la autenticidad de los tickets y apruebes la compra."
+                                           FontSize="12.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="EmptyOrdersApprovalState"
+                                Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="36,42"
+                                Visibility="Visible">
+                            <StackPanel HorizontalAlignment="Center" MaxWidth="560">
+                                <TextBlock Text="No hay solicitudes de compra de MarketStore en este momento"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,8" />
+                                <TextBlock Text="Flujo completo:&#x0a;1. El usuario compra tickets en WalletPay.&#x0a;2. En WalletPay presiona 'Usar en Tienda Virtual' para abrir MarketStore.&#x0a;3. En MarketStore selecciona los productos que desea y confirma el pago con sus tickets.&#x0a;4. La solicitud aparecerá aquí al instante para que verifiques la autenticidad de los tickets y apruebes la compra."
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl x:Name="OrdersApprovalItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource BgCardElevated}"
+                                            BorderBrush="{DynamicResource IosSeparator}"
+                                            BorderThickness="1"
+                                            CornerRadius="18"
+                                            Padding="22,18"
+                                            Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                        <Border Background="{DynamicResource SoftBlue}" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding OrderId, StringFormat='ORDEN #{0}'}" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource IosBlue}" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding TimestampFull}" FontSize="12.5" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding BuyerName, StringFormat='Cliente: {0}'}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                    <TextBlock Text="{Binding BuyerEmail}" FontSize="12.5" Foreground="{DynamicResource TextSecondary}" />
+                                                </StackPanel>
+
+                                                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top">
+                                                    <Border Background="{DynamicResource SoftAmber}" CornerRadius="9" Padding="11,5" HorizontalAlignment="Right" Margin="0,0,0,6">
+                                                        <TextBlock Text="{Binding StatusPillText}" FontSize="11" FontWeight="Bold" Foreground="#D97706" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding SubtotalFormatted}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Right" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Border Background="{DynamicResource BgCell}" CornerRadius="12" Padding="14,11" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                        <TextBlock Text="PRODUCTOS SELECCIONADOS EN MARKETSTORE" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding ItemsSummary}" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="TICKETS PRESENTADOS PARA PAGO" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding TicketsAppliedFormatted}" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource IosBlue}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <!-- Dictamen de Autenticidad Criptográfica -->
+                                            <Border Background="{DynamicResource SoftGreen}" CornerRadius="10" Padding="12,8" Margin="0,0,0,12">
+                                                <TextBlock Text="{Binding VerificationReport}"
+                                                           FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#248A3D"
+                                                           TextWrapping="Wrap" />
+                                            </Border>
+
+                                            <!-- Botones del Administrador: 1. Verificar Autenticidad -> 2. Aprobar Compra -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        HorizontalAlignment="Right"
+                                                        Visibility="{Binding IsPending, Converter={StaticResource BoolToVisConv}}">
+                                                <Button Style="{StaticResource AppleSecondaryBtn}"
+                                                        Padding="14,9"
+                                                        Margin="0,0,10,0"
+                                                        Tag="{Binding OrderId}"
+                                                        Click="OnVerifyOrderTicketsAuthenticityClick"
+                                                        Content="1. Verificar Autenticidad de Tickets" />
+                                                <Button Style="{StaticResource ApplePrimaryBtn}"
+                                                        Background="#34C759"
+                                                        Padding="18,9"
+                                                        Margin="0,0,10,0"
+                                                        Tag="{Binding OrderId}"
+                                                        Click="OnApproveOrderPurchaseClick"
+                                                        Content="2. Aprobar Compra y Marcar Tickets Usados" />
+                                                <Button Style="{StaticResource AppleSecondaryBtn}"
+                                                        Foreground="#FF3B30"
+                                                        Padding="14,9"
+                                                        Tag="{Binding OrderId}"
+                                                        Click="OnRejectOrderPurchaseClick"
+                                                        Content="Rechazar" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- ==========================================================================
+                         VISTA 3: BÓVEDA DE TICKETS (USADOS VS. COMPRADOS SIN USAR — DISEÑO 1:1)
+                         ========================================================================== -->
+                    <StackPanel x:Name="ViewTicketsPanel" Visibility="Collapsed">
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="20,18"
+                                Margin="0,0,0,18">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="BÓVEDA CENTRAL DE CERTIFICADOS · DISEÑO 1:1 CON WALLETPAY Y MARKETSTORE"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource IosBlue}" />
+                                    <TextBlock Text="Tickets Comprados Sin Usar vs. Tickets Ya Usados"
+                                               FontSize="21"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               Margin="0,2,0,2" />
+                                    <TextBlock Text="Visualiza los tickets que ya se compraron pero aún no se usan, y aquellos que ya fueron usados y aprobados en compras de MarketStore."
+                                               FontSize="12.5"
+                                               Foreground="{DynamicResource TextSecondary}" />
+                                </StackPanel>
+
+                                <Border Grid.Column="1" Background="{DynamicResource IosFill}" CornerRadius="11" Padding="3" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="VaultSegAllBtn" Style="{StaticResource IosSegmentBtn}" Click="OnVaultFilterSegmentClick" Tag="ALL" Content="Todos (0)" />
+                                        <Button x:Name="VaultSegUnusedBtn" Style="{StaticResource IosSegmentBtn}" Click="OnVaultFilterSegmentClick" Tag="UNUSED" Content="Sin Usar · Activos (0)" />
+                                        <Button x:Name="VaultSegUsedBtn" Style="{StaticResource IosSegmentBtn}" Click="OnVaultFilterSegmentClick" Tag="USED" Content="Ya Usados · Canjeados (0)" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="EmptyTicketsVaultState"
+                                Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="36,42"
+                                Visibility="Visible">
+                            <StackPanel HorizontalAlignment="Center" MaxWidth="520">
+                                <TextBlock Text="No hay tickets en esta categoría"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="Los tickets comprados desde la aplicación móvil WalletPay aparecerán aquí automáticamente con su estado 'SIN USAR · ACTIVO' y pasarán a 'YA USADO · CANJEADO' cuando apruebes una compra de MarketStore."
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl x:Name="TicketsVaultItemsControl">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="420"
+                                            CornerRadius="22"
+                                            Background="{Binding ColorClass, Converter={StaticResource TicketTierBrushConv}}"
+                                            Opacity="{Binding CardOpacity}"
+                                            Padding="22,20"
+                                            Margin="0,0,16,16">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,16">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Border Width="32" Height="32" CornerRadius="9" Background="#28FFFFFF" Margin="0,0,10,0">
+                                                        <Viewbox Width="16" Height="16">
+                                                            <Canvas Width="24" Height="24">
+                                                                <Path Data="M3 9.5L12 4L21 9.5Z M5.5 11V18 M10 11V18 M14 11V18 M18.5 11V18 M3 20.5H21"
+                                                                      Stroke="White" StrokeThickness="2.1" StrokeLineJoin="Round" />
+                                                            </Canvas>
+                                                        </Viewbox>
+                                                    </Border>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="BANCO CENTRAL" FontSize="11.5" FontWeight="Bold" Foreground="White" />
+                                                        <TextBlock Text="{Binding TierUpper}" FontSize="10" Foreground="#CCFFFFFF" />
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <Border Background="#33000000"
+                                                        BorderBrush="#44FFFFFF"
+                                                        BorderThickness="1"
+                                                        CornerRadius="12"
+                                                        Padding="10,4"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding StatusBadgeText}"
+                                                               FontSize="10"
+                                                               FontWeight="Bold"
+                                                               Foreground="White" />
+                                                </Border>
+                                            </Grid>
+
+                                            <Grid Margin="0,0,0,16">
+                                                <StackPanel>
+                                                    <TextBlock Text="VALOR NOMINAL FIJO" FontSize="10" FontWeight="Bold" Foreground="#B8FFFFFF" />
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Baseline">
+                                                        <TextBlock Text="{Binding AmountFormatted}" FontSize="36" FontWeight="Bold" Foreground="White" />
+                                                        <TextBlock Text=" MXN" FontSize="14" FontWeight="SemiBold" Foreground="#CCFFFFFF" VerticalAlignment="Bottom" Margin="4,0,0,5" />
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <Border Width="44" Height="32" CornerRadius="7"
+                                                        Background="#44FFFFFF"
+                                                        BorderBrush="#66FFFFFF"
+                                                        BorderThickness="1"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Center">
+                                                    <UniformGrid Rows="2" Columns="2" Margin="4">
+                                                        <Border BorderBrush="#55FFFFFF" BorderThickness="0,0,1,1" />
+                                                        <Border BorderBrush="#55FFFFFF" BorderThickness="0,0,0,1" />
+                                                        <Border BorderBrush="#55FFFFFF" BorderThickness="0,0,1,0" />
+                                                        <Border />
+                                                    </UniformGrid>
+                                                </Border>
+                                            </Grid>
+
+                                            <Border Background="#24000000" CornerRadius="12" Padding="12,9" Margin="0,0,0,12">
+                                                <Grid>
+                                                    <StackPanel>
+                                                        <TextBlock Text="COMPRADO POR USUARIO" FontSize="9.5" FontWeight="Bold" Foreground="#B0FFFFFF" />
+                                                        <TextBlock Text="{Binding OwnerName}" FontSize="13.5" FontWeight="Bold" Foreground="White" />
+                                                        <TextBlock Text="{Binding OwnerEmail}" FontSize="11" Foreground="#CCFFFFFF" />
+                                                    </StackPanel>
+                                                    <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                        <TextBlock Text="MÉTODO DE COMPRA" FontSize="9.5" FontWeight="Bold" Foreground="#B0FFFFFF" HorizontalAlignment="Right" />
+                                                        <TextBlock Text="{Binding PaymentMethod}" FontSize="11.5" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Right" />
+                                                        <TextBlock Text="{Binding PurchaseTransactionId}" FontFamily="Consolas" FontSize="10.5" Foreground="#CCFFFFFF" HorizontalAlignment="Right" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <Grid Margin="0,0,0,14">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="FOLIO DE SEGURIDAD" FontSize="9.5" FontWeight="Bold" Foreground="#B0FFFFFF" />
+                                                    <TextBlock Text="{Binding DisplayedSerial}" FontFamily="Consolas" FontSize="13" FontWeight="Bold" Foreground="White" Margin="0,2,0,0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="HORA EXACTA DE COMPRA" FontSize="9.5" FontWeight="Bold" Foreground="#B0FFFFFF" />
+                                                    <TextBlock Text="{Binding PurchaseTimestampFull}" FontSize="12" FontWeight="SemiBold" Foreground="White" Margin="0,2,0,0" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Border Background="#2E000000" CornerRadius="10" Padding="11,8" Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding UsageSummaryText}" FontSize="11.5" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding SignatureHash}" FontFamily="Consolas" FontSize="10" Foreground="#AAFFFFFF" Margin="0,2,0,0" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Button Style="{StaticResource AppleSecondaryBtn}"
+                                                    Background="#30FFFFFF"
+                                                    Foreground="White"
+                                                    Tag="{Binding Id}"
+                                                    Click="OnToggleRevealTicketSerialClick"
+                                                    Content="Revelar / Ocultar Folio Completo" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- ==========================================================================
+                         VISTA 4: CAPITAL TOTAL OBTENIDO Y RENDIMIENTO POR USUARIO / DENOMINACIÓN
+                         ========================================================================== -->
+                    <StackPanel x:Name="ViewCapitalPanel" Visibility="Collapsed">
+                        <Grid Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.15*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Background="{DynamicResource BgCardElevated}"
+                                    BorderBrush="{DynamicResource IosSeparator}"
+                                    BorderThickness="1"
+                                    CornerRadius="18"
+                                    Padding="22,20"
+                                    Margin="0,0,14,0">
+                                <StackPanel>
+                                    <TextBlock Text="TESORERÍA DEL BANCO CENTRAL · RESERVA EN TIEMPO REAL"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               Foreground="#28B44B" />
+                                    <TextBlock Text="Capital Total Obtenido de Venta de Tickets"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               Margin="0,2,0,6" />
+                                    <TextBlock x:Name="CapHeroTotalText"
+                                               Text="$0.00 MXN"
+                                               FontSize="40"
+                                               FontWeight="Bold"
+                                               Foreground="#28B44B"
+                                               Margin="0,0,0,14" />
+
+                                    <TextBlock Text="DISTRIBUCIÓN DEL CAPITAL EMITIDO (SIN USAR VS. YA USADOS)"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,6" />
+
+                                    <Grid Height="14" Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition x:Name="CapUnusedBarCol" Width="1*" />
+                                            <ColumnDefinition x:Name="CapUsedBarCol" Width="1*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Background="{DynamicResource IosBlue}" CornerRadius="7,0,0,7" Margin="0,0,2,0" />
+                                        <Border Grid.Column="1" Background="{DynamicResource IosPurple}" CornerRadius="0,7,7,0" />
+                                    </Grid>
+
+                                    <UniformGrid Columns="2">
+                                        <Border Background="{DynamicResource BgCell}" CornerRadius="14" Padding="14,12" Margin="0,0,8,0">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <Ellipse Width="9" Height="9" Fill="{DynamicResource IosBlue}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                    <TextBlock Text="TICKETS COMPRADOS SIN USAR" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="CapUnusedAmountText" Text="$0.00 MXN" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                <TextBlock x:Name="CapUnusedCountText" Text="0 certificados activos en WalletPay" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Background="{DynamicResource BgCell}" CornerRadius="14" Padding="14,12" Margin="8,0,0,0">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <Ellipse Width="9" Height="9" Fill="{DynamicResource IosPurple}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                    <TextBlock Text="TICKETS YA USADOS (CANJEADOS)" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource TextSecondary}" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="CapUsedAmountText" Text="$0.00 MXN" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                <TextBlock x:Name="CapUsedCountText" Text="0 certificados liquidados en MarketStore" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="{DynamicResource BgCardElevated}"
+                                    BorderBrush="{DynamicResource IosSeparator}"
+                                    BorderThickness="1"
+                                    CornerRadius="18"
+                                    Padding="22,20">
+                                <StackPanel>
+                                    <TextBlock Text="DESGLOSE POR DENOMINACIÓN OFICIAL"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource IosBlue}" />
+                                    <TextBlock Text="Recaudación por Nivel de Ticket"
+                                               FontSize="19"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               Margin="0,2,0,12" />
+
+                                    <ItemsControl x:Name="DenominationBreakdownItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource BgCell}"
+                                                        CornerRadius="12"
+                                                        Padding="13,10"
+                                                        Margin="0,0,0,9">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                            <TextBlock Text="{Binding CountsSummary}" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" Margin="0,1,0,5" />
+                                                            <Border HorizontalAlignment="Left"
+                                                                    Height="6"
+                                                                    CornerRadius="3"
+                                                                    Width="{Binding BarWidth}"
+                                                                    Background="{Binding AccentHex, Converter={StaticResource HexToBrushConv}}" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding TotalCapitalFormatted}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Right" />
+                                                            <TextBlock Text="{Binding ShareText}" FontSize="11" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Right" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Tabla de Capital y Tickets por Usuario -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="22,18">
+                            <StackPanel>
+                                <TextBlock Text="BALANCE DETALLADO POR USUARIO"
+                                           FontSize="10.5"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource IosBlue}" />
+                                <TextBlock Text="Tickets Comprados, Sin Usar, Usados y Capital Aportado por Usuario"
+                                           FontSize="19"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,2,0,14" />
+
+                                <ItemsControl x:Name="UsersCapitalItemsControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource BgCell}"
+                                                    CornerRadius="14"
+                                                    Padding="16,13"
+                                                    Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="260" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="210" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Border Width="40" Height="40" CornerRadius="20"
+                                                                Background="{Binding AvatarHex, Converter={StaticResource HexToBrushConv}}"
+                                                                Margin="0,0,12,0">
+                                                            <TextBlock Text="{Binding AvatarInitials}" Foreground="White" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                            <TextBlock Text="{Binding Email}" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="CAPITAL APORTADO" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding TotalCapitalContributed, StringFormat='${0:N2} MXN'}" FontSize="15.5" FontWeight="Bold" Foreground="#28B44B" />
+                                                        <TextBlock Text="{Binding TotalTicketsPurchased, StringFormat='{}{0} tickets comprados'}" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="SIN USAR (ACTIVOS)" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding UnusedBalance, StringFormat='${0:N2} MXN'}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource IosBlue}" />
+                                                        <TextBlock Text="{Binding UnusedTicketsCount, StringFormat='{}{0} tickets disponibles'}" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                                        <TextBlock Text="YA USADOS (CANJEADOS)" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding UsedBalance, StringFormat='${0:N2} MXN'}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource IosPurple}" />
+                                                        <TextBlock Text="{Binding UsedTicketsCount, StringFormat='{}{0} tickets utilizados'}" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" />
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                                        <TextBlock Text="ÚLTIMA HORA DE COMPRA" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding LastPurchaseTime}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,2,0,0" />
+                                                    </StackPanel>
+
+                                                    <Button Grid.Column="5"
+                                                            Style="{StaticResource AppleSecondaryBtn}"
+                                                            Tag="{Binding Id}"
+                                                            Click="OnInspectUserHistoryClick"
+                                                            Content="Ver Historial"
+                                                            VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==========================================================================
+                         VISTA 5: AUDITOR CRIPTOGRÁFICO ANTI-DOBLE GASTO Y BITÁCORA SQLITE
+                         ========================================================================== -->
+                    <StackPanel x:Name="ViewAuditorPanel" Visibility="Collapsed">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.05*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Columna Izquierda: Verificador Criptográfico de Tickets -->
+                            <Border Grid.Column="0"
+                                    Background="{DynamicResource BgCardElevated}"
+                                    BorderBrush="{DynamicResource IosSeparator}"
+                                    BorderThickness="1"
+                                    CornerRadius="18"
+                                    Padding="22,20"
+                                    Margin="0,0,14,0">
+                                <StackPanel>
+                                    <TextBlock Text="AUDITORÍA DE TICKETS · ANTI-DOBLE GASTO"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource IosBlue}" />
+                                    <TextBlock Text="Verificador de Autenticidad de Tickets"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               Margin="0,2,0,4" />
+                                    <TextBlock Text="Comprueba en tiempo real en la base de datos SQLite la autenticidad, sello de emisión, hora de compra y estado de cualquier ticket emitido."
+                                               FontSize="12.5"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,14" />
+
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="AuditFolioInput"
+                                                 Grid.Column="0"
+                                                 Style="{StaticResource IosTextBox}"
+                                                 FontFamily="Consolas"
+                                                 Text=""
+                                                 Margin="0,0,8,0" />
+                                        <Button Grid.Column="1"
+                                                Style="{StaticResource ApplePrimaryBtn}"
+                                                Click="OnRunAuditVerifyClick"
+                                                Content="Verificar Folio" />
+                                    </Grid>
+
+                                    <TextBlock Text="FOLIOS EMITIDOS EN LA BASE DE DATOS:"
+                                               FontSize="10.5"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,6" />
+                                    <WrapPanel x:Name="QuickAuditFoliosPanel" Margin="0,0,0,14" />
+
+                                    <Border x:Name="AuditResultCard"
+                                            Background="{DynamicResource BgCell}"
+                                            CornerRadius="14"
+                                            Padding="16,14">
+                                        <StackPanel>
+                                            <Border x:Name="AuditResultStatusBanner"
+                                                    Background="{DynamicResource SoftBlue}"
+                                                    CornerRadius="10"
+                                                    Padding="12,8"
+                                                    Margin="0,0,0,12">
+                                                <TextBlock x:Name="AuditResultBannerText"
+                                                           Text="INGRESA O SELECCIONA UN FOLIO PARA VERIFICAR SU VALIDEZ"
+                                                           FontSize="12"
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource IosBlue}" />
+                                            </Border>
+
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="FOLIO Y VALOR NOMINAL" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                    <TextBlock x:Name="AuditResFolioVal" Text="—" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="TITULAR QUE REALIZÓ LA COMPRA" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                    <TextBlock x:Name="AuditResOwnerVal" Text="—" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="FECHA Y HORA DE COMPRA" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                    <TextBlock x:Name="AuditResPurchaseTimeVal" Text="—" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="ESTADO DE USO / CANJE" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                    <TextBlock x:Name="AuditResUsageVal" Text="—" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <TextBlock Text="SELLO DE AUTENTICIDAD DEL BANCO CENTRAL" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                            <TextBlock x:Name="AuditResHashVal"
+                                                       Text="—"
+                                                       FontFamily="Consolas"
+                                                       FontSize="11.5"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Columna Derecha: Bitácora Criptográfica en Tiempo Real -->
+                            <Border Grid.Column="1"
+                                    Background="{DynamicResource BgCardElevated}"
+                                    BorderBrush="{DynamicResource IosSeparator}"
+                                    BorderThickness="1"
+                                    CornerRadius="18"
+                                    Padding="20,18">
+                                <StackPanel>
+                                    <TextBlock Text="BITÁCORA DE EVENTOS SQLITE Y SERVIDOR API (:5050)"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,10" />
+
+                                    <ItemsControl x:Name="AuditLogsItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource BgCell}" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="68" />
+                                                            <ColumnDefinition Width="68" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding Time}" FontFamily="Consolas" FontSize="11.5" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" />
+                                                        <Border Grid.Column="1" Background="{Binding AccentHex, Converter={StaticResource HexToBrushConv}}" CornerRadius="5" Padding="5,1" Margin="0,0,8,0" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Category}" FontSize="9.5" FontWeight="Bold" Foreground="White" />
+                                                        </Border>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Message}" FontSize="11.5" Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ==========================================================================
+             PANTALLA DE AUTENTICACIÓN DE ADMINISTRADOR (LOCK SCREEN ESTILO iOS / macOS)
+             ========================================================================== -->
+        <Grid x:Name="AdminLockOverlay" Background="#E6000000" Visibility="Collapsed">
+            <Border Width="440"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Background="{DynamicResource BgCardElevated}"
+                    BorderBrush="{DynamicResource IosSeparator}"
+                    BorderThickness="1"
+                    CornerRadius="26"
+                    Padding="32,30">
+                <StackPanel HorizontalAlignment="Center">
+                    <Border Width="64" Height="64" CornerRadius="18" Background="{DynamicResource IosBlue}" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <Viewbox Width="32" Height="32">
+                            <Canvas Width="24" Height="24">
+                                <Path Data="M7 3H5A2 2 0 0 0 3 5V7 M17 3H19A2 2 0 0 1 21 5V7 M7 21H5A2 2 0 0 1 3 19V17 M17 21H19A2 2 0 0 0 21 19V17 M8.5 9V10.5 M15.5 9V10.5 M12 9V13.2H11 M9 16C9.8 16.7 10.8 17 12 17C13.2 17 14.2 16.7 15 16"
+                                      Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+
+                    <TextBlock Text="CONSOLA EXCLUSIVA DE ADMINISTRADOR"
+                               FontSize="10.5"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource IosBlue}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="CentralBank Desktop"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               HorizontalAlignment="Center"
+                               Margin="0,4,0,6" />
+                    <TextBlock x:Name="AdminLockSubtitle"
+                               Text="Autoridad emisora y auditora de tickets electrónicos para WalletPay y MarketStore. Ingresa tu clave de administrador para desbloquear el Libro Mayor."
+                               FontSize="12.5"
+                               Foreground="{DynamicResource TextSecondary}"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,16" />
+
+                    <PasswordBox x:Name="AdminPasswordBox"
+                                 Padding="12,10"
+                                 FontSize="13.5"
+                                 Margin="0,0,0,10"
+                                 KeyDown="OnAdminPasswordKeyDown" />
+
+                    <TextBlock x:Name="AdminLockErrorText"
+                               Text=""
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource IosRed}"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed"
+                               Margin="0,0,0,12" />
+
+                    <Button x:Name="AdminUnlockBtn"
+                            Style="{StaticResource ApplePrimaryBtn}"
+                            Padding="20,12"
+                            FontSize="14"
+                            HorizontalAlignment="Stretch"
+                            Click="OnUnlockAdminConsoleClick"
+                            Content="Desbloquear Consola de Administrador" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

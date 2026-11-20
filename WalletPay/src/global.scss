@@ -1,0 +1,285 @@
+/* Ionic core */
+@import "@ionic/angular/css/core.css";
+@import "@ionic/angular/css/normalize.css";
+@import "@ionic/angular/css/structure.css";
+@import "@ionic/angular/css/typography.css";
+@import "@ionic/angular/css/display.css";
+@import "@ionic/angular/css/padding.css";
+@import "@ionic/angular/css/flex-utils.css";
+
+/* Paleta oscura oficial de Ionic (iOS), activada con la clase .ion-palette-dark en <html> */
+@import "@ionic/angular/css/palettes/dark.class.css";
+
+/* ==========================================================================
+   TOKENS — iOS Human Interface Guidelines
+   Claro: blanco puro #FFFFFF · Oscuro: negro puro #000000
+   ========================================================================== */
+:root {
+  /* San Francisco: la fuente del sistema en dispositivos Apple */
+  --ion-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  /* Colores de sistema de iOS */
+  --ion-color-primary: #007AFF;
+  --ion-color-primary-rgb: 0, 122, 255;
+  --ion-color-primary-contrast: #FFFFFF;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #006BE0;
+  --ion-color-primary-tint: #1A87FF;
+
+  --ion-color-success: #34C759;
+  --ion-color-success-rgb: 52, 199, 89;
+  --ion-color-success-contrast: #FFFFFF;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #2EAF4E;
+  --ion-color-success-tint: #48CD6A;
+
+  --ion-color-danger: #FF3B30;
+  --ion-color-danger-rgb: 255, 59, 48;
+  --ion-color-danger-contrast: #FFFFFF;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #E0342A;
+  --ion-color-danger-tint: #FF4F45;
+
+  /* Superficies */
+  --ion-background-color: #FFFFFF;
+  --ion-background-color-rgb: 255, 255, 255;
+  --ion-text-color: #000000;
+  --ion-text-color-rgb: 0, 0, 0;
+  --ion-toolbar-background: #F9F9F9;
+  --ion-toolbar-border-color: rgba(60, 60, 67, 0.29);
+  --ion-tab-bar-background: #F9F9F9;
+  --ion-tab-bar-border-color: rgba(60, 60, 67, 0.29);
+  --ion-item-background: #F2F2F7;
+  --ion-border-color: rgba(60, 60, 67, 0.29);
+
+  /* Etiquetas (jerarquía de texto de iOS) */
+  --ios-label: #000000;
+  --ios-label-2: rgba(60, 60, 67, 0.6);
+  --ios-label-3: rgba(60, 60, 67, 0.3);
+
+  --ios-cell: #F2F2F7;
+  --ios-fill: rgba(120, 120, 128, 0.12);
+  --ios-separator: rgba(60, 60, 67, 0.29);
+  --ios-sheet-bg: #F2F2F7;
+  --ios-sheet-cell: #FFFFFF;
+  --ios-hud: rgba(242, 242, 247, 0.82);
+  --ios-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 12px 28px -8px rgba(0, 0, 0, 0.22);
+  --ios-pay-bg: #000000;
+  --ios-pay-fg: #FFFFFF;
+}
+
+:root.ion-palette-dark,
+:root.ion-palette-dark.ios {
+  --ion-color-primary: #0A84FF;
+  --ion-color-primary-rgb: 10, 132, 255;
+  --ion-color-primary-contrast: #FFFFFF;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #0974E0;
+  --ion-color-primary-tint: #2390FF;
+
+  --ion-color-success: #30D158;
+  --ion-color-success-rgb: 48, 209, 88;
+  --ion-color-success-shade: #2AB84E;
+  --ion-color-success-tint: #45D669;
+
+  --ion-color-danger: #FF453A;
+  --ion-color-danger-rgb: 255, 69, 58;
+
+  --ion-background-color: #000000;
+  --ion-background-color-rgb: 0, 0, 0;
+  --ion-text-color: #FFFFFF;
+  --ion-text-color-rgb: 255, 255, 255;
+  --ion-toolbar-background: #161618;
+  --ion-toolbar-border-color: rgba(84, 84, 88, 0.65);
+  --ion-tab-bar-background: #161618;
+  --ion-tab-bar-border-color: rgba(84, 84, 88, 0.65);
+  --ion-item-background: #1C1C1E;
+  --ion-border-color: rgba(84, 84, 88, 0.65);
+
+  --ios-label: #FFFFFF;
+  --ios-label-2: rgba(235, 235, 245, 0.6);
+  --ios-label-3: rgba(235, 235, 245, 0.3);
+
+  --ios-cell: #1C1C1E;
+  --ios-fill: rgba(118, 118, 128, 0.24);
+  --ios-separator: rgba(84, 84, 88, 0.65);
+  --ios-sheet-bg: #1C1C1E;
+  --ios-sheet-cell: #2C2C2E;
+  --ios-hud: rgba(44, 44, 46, 0.82);
+  --ios-shadow-card: 0 14px 32px -10px rgba(0, 0, 0, 0.9);
+  --ios-pay-bg: #FFFFFF;
+  --ios-pay-fg: #000000;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Los campos de texto deben seguir siendo seleccionables/editables en Safari */
+button,
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ==========================================================================
+   §1 RESPUESTA — feedback en pointer-down, sin latencia
+   Presionar: 100 ms ease-out · Soltar: más lento, como algo físico que regresa
+   ========================================================================== */
+.apple-pressable {
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 260ms ease;
+}
+
+.apple-pressable:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+  transition: transform 100ms ease-out, opacity 100ms ease-out;
+}
+
+/* ==========================================================================
+   CURVA CONTINUA (squircle)
+   border-radius como base; corner-shape donde el navegador lo soporte
+   ========================================================================== */
+.continuous {
+  border-radius: var(--r, 22px);
+}
+
+@supports (corner-shape: squircle) {
+  .continuous {
+    corner-shape: squircle;
+    border-radius: calc(var(--r, 22px) * 1.6);
+  }
+}
+
+ion-list.list-inset {
+  border-radius: 12px;
+}
+
+/* ==========================================================================
+   DEGRADADOS Y MATERIALES DE LOS TICKETS (Apple Card / Gift Card Craft)
+   ========================================================================== */
+.card-tier-50 {
+  background:
+    radial-gradient(110% 90% at 88% 12%, rgba(120, 226, 255, 0.55) 0%, transparent 55%),
+    radial-gradient(95% 95% at 10% 95%, rgba(0, 46, 168, 0.85) 0%, transparent 65%),
+    linear-gradient(138deg, #007AFF 0%, #0051D5 55%, #002B7F 100%);
+}
+
+.card-tier-100 {
+  background:
+    radial-gradient(110% 90% at 88% 12%, rgba(217, 130, 255, 0.5) 0%, transparent 55%),
+    radial-gradient(95% 95% at 15% 95%, rgba(36, 20, 108, 0.9) 0%, transparent 65%),
+    linear-gradient(138deg, #7C3AED 0%, #4F46E5 52%, #24195E 100%);
+}
+
+.card-tier-200 {
+  background:
+    radial-gradient(110% 90% at 88% 12%, rgba(255, 224, 130, 0.55) 0%, transparent 55%),
+    radial-gradient(95% 95% at 10% 95%, rgba(154, 32, 22, 0.85) 0%, transparent 65%),
+    linear-gradient(138deg, #F59E0B 0%, #EA580C 52%, #9A1B1B 100%);
+}
+
+.card-tier-500 {
+  background:
+    radial-gradient(120% 80% at 85% 10%, rgba(255, 214, 10, 0.22) 0%, transparent 52%),
+    radial-gradient(90% 90% at 15% 90%, rgba(255, 255, 255, 0.08) 0%, transparent 60%),
+    linear-gradient(138deg, #3A3A3C 0%, #1C1C1E 48%, #070708 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 10, 0.32);
+}
+
+/* ==========================================================================
+   BOTTOM SHEETS — altura automática, se cierran deslizando hacia abajo
+   ========================================================================== */
+ion-modal.sheet-auto {
+  --height: auto;
+  --background: var(--ios-sheet-bg);
+  --border-radius: 28px;
+  --backdrop-opacity: 0.4;
+}
+
+ion-modal.sheet-auto .ion-page {
+  position: relative;
+  display: block;
+  contain: content;
+}
+
+ion-modal.sheet-auto .sheet {
+  max-height: 88vh;
+  overflow-y: auto;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+}
+
+ion-modal.sheet-auto ion-item {
+  --background: var(--ios-sheet-cell);
+}
+
+/* Cabecera estándar de sheet: título centrado + botón cerrar circular */
+.sheet-head {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  padding: 18px 16px 6px;
+}
+
+.sheet-title {
+  grid-column: 2;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ios-label);
+}
+
+.sheet-close {
+  grid-column: 3;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ios-fill);
+  color: var(--ios-label-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* ==========================================================================
+   §14 ACCESIBILIDAD — movimiento y transparencia reducidos
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 120ms !important;
+  }
+
+  .apple-pressable:active {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  ion-header ion-toolbar {
+    --opacity: 1 !important;
+  }
+
+  .header-background,
+  ion-tab-bar.tab-bar-translucent {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  ion-tab-bar.tab-bar-translucent {
+    --background: var(--ion-tab-bar-background) !important;
+  }
+}
