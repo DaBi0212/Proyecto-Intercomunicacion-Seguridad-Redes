@@ -91,16 +91,14 @@ import { SfSymbolComponent } from './sf-symbol.component';
               </div>
             </button>
 
-            <button
-              type="button"
-              class="ml-net-btn continuous apple-pressable"
+            <div
+              class="ml-net-btn continuous"
               [class.ok]="market.bankConnected()"
-              (click)="openNetModal()"
-              title="Configurar IP del Banco Central (:5050)"
+              title="Conectado automáticamente con Banco Central"
             >
               <span class="net-dot"></span>
-              <span class="net-lbl">Banco :5050</span>
-            </button>
+              <span class="net-lbl">Banco Online</span>
+            </div>
 
             <!-- Botón de Carrito directo en Fila 1 para Móvil -->
             <button
@@ -303,15 +301,13 @@ import { SfSymbolComponent } from './sf-symbol.component';
             <sf-symbol name="chevron.right" [size]="12" />
           </button>
 
-          <button
-            type="button"
+          <div
             class="mms-net"
             [class.ok]="market.bankConnected()"
-            (click)="openNetModal()"
           >
             <span class="net-dot"></span>
-            <span>:5050</span>
-          </button>
+            <span>Banco</span>
+          </div>
         </div>
       </div>
     </header>
@@ -448,15 +444,6 @@ import { SfSymbolComponent } from './sf-symbol.component';
           }
 
           <div class="mmd-section-title">CONFIGURACIÓN Y CUENTA</div>
-          <button
-            type="button"
-            class="mmd-item"
-            (click)="mobileDrawerOpen.set(false); openNetModal()"
-          >
-            <sf-symbol name="wifi" [size]="18" />
-            <span>IP Banco Central (:5050)</span>
-          </button>
-
           <button
             type="button"
             class="mmd-item"

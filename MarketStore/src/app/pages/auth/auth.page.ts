@@ -819,11 +819,21 @@ export class AuthPage implements OnInit {
   email = '';
   password = '';
 
+  private autoDiscoverTimer?: ReturnType<typeof setInterval>;
+
   async ngOnInit(): Promise<void> {
-    this.bankUrlInput = this.market.crypto.getCustomBankUrl();
+    await this.tryFetchAndSelectFirstUser();
+    this.autoDiscoverTimer = setInterval(async () => {
+      if (!this.market.isAuthenticated() && !this.market.bankConnected()) {
+        await this.tryFetchAndSelectFirstUser();
+      }
+    }, 3500);
+  }
+
+  private async tryFetchAndSelectFirstUser(): Promise<void> {
     await this.market.fetchRegisteredUsers();
     const users = this.market.registeredUsers();
-    if (users.length > 0) {
+    if (users.length > 0 && !this.email) {
       this.selectRegisteredUser(users[0]);
     }
   }
