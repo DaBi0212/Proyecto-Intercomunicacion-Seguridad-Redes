@@ -129,17 +129,17 @@ export class BankCryptoService {
         })
     ]);
 
-    urls.add('http://192.168.1.74:5050/api');
+    urls.add('http://192.168.1.74:7070/api');
     urls.add(environment.bankApiUrl);
     if (typeof window !== 'undefined' && window.location?.hostname) {
       const host = window.location.hostname;
       if (host !== 'localhost' && host !== '127.0.0.1' && !host.includes('vercel.app')) {
-        urls.add(`http://${host}:5050/api`);
+        urls.add(`http://${host}:7070/api`);
       }
     }
-    urls.add('http://localhost:5050/api');
-    urls.add('http://127.0.0.1:5050/api');
-    urls.add('http://10.0.2.2:5050/api');
+    urls.add('http://localhost:7070/api');
+    urls.add('http://127.0.0.1:7070/api');
+    urls.add('http://10.0.2.2:7070/api');
 
     return Array.from(urls).filter((u) => !!u);
   }
