@@ -117,7 +117,7 @@ public class CentralBankApiServer : IDisposable
             var psi = new ProcessStartInfo
             {
                 FileName = "netsh",
-                Arguments = "advfirewall firewall add rule name=\"CentralBank_API_5050\" dir=in action=allow protocol=TCP localport=5050",
+                Arguments = $"advfirewall firewall add rule name=\"CentralBank_API_{DefaultPort}\" dir=in action=allow protocol=TCP localport={DefaultPort}",
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -163,7 +163,7 @@ public class CentralBankApiServer : IDisposable
             var psi = new ProcessStartInfo
             {
                 FileName = cfBinary,
-                Arguments = "tunnel --url http://127.0.0.1:5050 --no-autoupdate",
+                Arguments = $"tunnel --url http://127.0.0.1:{DefaultPort} --no-autoupdate",
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
