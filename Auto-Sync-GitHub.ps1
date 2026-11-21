@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # AUTO-SYNC GITHUB & VERCEL WATCHER
 # Monitorea automáticamente cambios en la carpeta del proyecto y hace
 # git add, commit y push a origin/main para que GitHub y Vercel se actualicen solos.
