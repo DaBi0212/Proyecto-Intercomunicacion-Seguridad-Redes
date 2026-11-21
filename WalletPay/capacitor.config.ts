@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'mx.aetherpay.wallet',
-  appName: 'AetherPay Wallet',
+  appName: 'WalletPay',
   webDir: 'www',
   server: {
     androidScheme: 'http',
