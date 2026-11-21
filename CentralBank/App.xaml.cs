@@ -1,5 +1,5 @@
-﻿using System.Configuration;
-using System.Data;
+﻿using System;
+using System.IO;
 using System.Windows;
 
 namespace CentralBank;
@@ -9,5 +9,28 @@ namespace CentralBank;
 /// </summary>
 public partial class App : Application
 {
+    public App()
+    {
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+                File.AppendAllText(logPath, $"[CRASH {DateTime.Now}] {e.ExceptionObject}\n");
+            }
+            catch { }
+        };
+
+        DispatcherUnhandledException += (s, e) =>
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+                File.AppendAllText(logPath, $"[DISPATCHER ERROR {DateTime.Now}] {e.Exception}\n");
+            }
+            catch { }
+        };
+    }
 }
+
 
