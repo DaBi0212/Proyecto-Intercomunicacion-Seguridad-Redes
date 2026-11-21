@@ -45,7 +45,8 @@ public class CentralBankApiServer : IDisposable
     public const string DiscoveryChannelUrl = "https://ntfy.sh/aetherpay_cb_dabi0212_net";
     public const string VercelStoreProductionUrl = "https://proyecto-intercomunicacion-segurida.vercel.app";
 
-    public string BaseUrl { get; } = "http://0.0.0.0:5050/";
+    public const int DefaultPort = 7070;
+    public string BaseUrl { get; } = $"http://0.0.0.0:{DefaultPort}/";
     public string PublicHttpsTunnelUrl { get; private set; } = string.Empty;
     public event Action<string>? TunnelUrlPublished;
 
