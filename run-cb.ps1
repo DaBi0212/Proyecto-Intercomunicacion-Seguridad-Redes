@@ -1,4 +1,4 @@
-﻿$binDir = "C:\Users\david\Desktop\Proyecto Redes\CentralBank\bin\Release\net10.0-windows"
+$binDir = "C:\Users\david\Desktop\Proyecto Redes\CentralBank\bin\Release\net10.0-windows"
 $exePath = Join-Path $binDir "CentralBank.exe"
 
 Write-Host "Iniciando CentralBank desde $exePath"
