@@ -30,7 +30,21 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        try
+        {
+            var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+            System.IO.File.AppendAllText(logPath, $"[MAINWINDOW CTOR {DateTime.Now}] Entrando al constructor...\n");
+        }
+        catch { }
+
         InitializeComponent();
+
+        try
+        {
+            var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+            System.IO.File.AppendAllText(logPath, $"[MAINWINDOW CTOR {DateTime.Now}] InitializeComponent completado.\n");
+        }
+        catch { }
 
         // Iniciar servidor API embebido en http://0.0.0.0:5050/ respaldado por SQLite (accesible por Wi-Fi LAN y Localhost)
         _apiServer = new CentralBankApiServer(_state);
