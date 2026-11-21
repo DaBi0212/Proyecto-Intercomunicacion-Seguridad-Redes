@@ -12,24 +12,18 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
   template: `
     <ion-content [fullscreen]="true">
       <main class="auth">
-        <!-- Barra superior de estado de conexión con CentralBank (:5050) y Vercel -->
+        <!-- Barra superior de estado de conexión automática con CentralBank y Vercel -->
         <header class="net-bar">
-          <button
-            type="button"
-            class="net-pill continuous apple-pressable"
-            [class.ok]="wallet.bankConnected()"
-            (click)="openNetModal()"
-          >
+          <div class="net-pill continuous" [class.ok]="wallet.bankConnected()">
             <span class="net-dot"></span>
             <span>
               {{
                 wallet.bankConnected()
-                  ? 'Banco Central Conectado'
-                  : 'Configurar IP Banco (:5050)'
+                  ? 'Banco Central Conectado Automáticamente'
+                  : 'Descubriendo Banco Central Automáticamente…'
               }}
             </span>
-            <sf-symbol name="gearshape.fill" [size]="13" />
-          </button>
+          </div>
 
           <button
             type="button"
@@ -180,90 +174,9 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
           }
 
           <p class="legal">
-            Conectado a <strong>{{ wallet.activeBankUrl() }}</strong> · Tienda en <strong>Vercel</strong>
+            Sincronización automática con <strong>CentralBank</strong> y <strong>MarketStore (Vercel)</strong>.
           </p>
         </section>
-
-        <!-- Modal de Configuración de IP del Servidor CentralBank y URL de MarketStore (Vercel) -->
-        <ion-modal
-          class="sheet-auto"
-          [isOpen]="netModalOpen()"
-          [initialBreakpoint]="1"
-          [breakpoints]="[0, 1]"
-          [handle]="true"
-          (didDismiss)="netModalOpen.set(false)"
-        >
-          <ng-template>
-            <div class="net-sheet">
-              <div class="sheet-head">
-                <span class="sheet-title">Conexión Red Real (APK + Banco + Vercel)</span>
-                <button class="sheet-close" aria-label="Cerrar" (click)="netModalOpen.set(false)">
-                  <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
-                </button>
-              </div>
-
-              <p class="net-desc">
-                Ingresa la dirección IP Wi-Fi de la computadora donde se ejecuta <strong>CentralBank.exe</strong> (puerto 5050) y la URL desplegada en <strong>Vercel</strong> para MarketStore.
-              </p>
-
-              <div class="net-form">
-                <label class="net-field">
-                  <span>IP / URL del Banco Central (:5050)</span>
-                  <input
-                    type="text"
-                    placeholder="http://192.168.1.74:5050/api"
-                    [(ngModel)]="bankUrlInput"
-                  />
-                </label>
-
-                <div class="preset-chips">
-                  <button type="button" class="p-chip" (click)="bankUrlInput = 'http://192.168.1.74:5050/api'">
-                    Wi-Fi PC (192.168.1.74)
-                  </button>
-                  <button type="button" class="p-chip" (click)="bankUrlInput = 'http://localhost:5050/api'">
-                    Localhost
-                  </button>
-                </div>
-
-                <label class="net-field">
-                  <span>URL de MarketStore (Desplegada en Vercel)</span>
-                  <input
-                    type="text"
-                    placeholder="https://proyecto-intercomunicacion-seguridad-redes.vercel.app"
-                    [(ngModel)]="storeUrlInput"
-                  />
-                </label>
-
-                <div class="preset-chips">
-                  <button
-                    type="button"
-                    class="p-chip"
-                    (click)="storeUrlInput = 'https://proyecto-intercomunicacion-seguridad-redes.vercel.app'"
-                  >
-                    Vercel Producción
-                  </button>
-                  <button type="button" class="p-chip" (click)="storeUrlInput = 'http://192.168.1.74:4201'">
-                    Red Local (:4201)
-                  </button>
-                </div>
-
-                @if (netFeedback()) {
-                  <p class="net-msg" [class.ok]="wallet.bankConnected()">{{ netFeedback() }}</p>
-                }
-
-                <button
-                  type="button"
-                  class="btn-filled continuous apple-pressable"
-                  [disabled]="testingNet()"
-                  (click)="saveAndTestNet()"
-                >
-                  <sf-symbol name="wifi" [size]="18" />
-                  <span>{{ testingNet() ? 'Verificando conexión...' : 'Guardar y Probar Conexión' }}</span>
-                </button>
-              </div>
-            </div>
-          </ng-template>
-        </ion-modal>
       </main>
     </ion-content>
   `,
@@ -603,10 +516,15 @@ export class AuthPage implements OnInit {
   email = '';
   password = '';
 
+  private autoDiscoverTimer?: ReturnType<typeof setInterval>;
+
   ngOnInit(): void {
-    this.bankUrlInput = this.wallet.crypto.getCustomBankUrl();
-    this.storeUrlInput = this.wallet.crypto.getMarketStoreUrl();
     this.wallet.fetchRegisteredUsers();
+    this.autoDiscoverTimer = setInterval(() => {
+      if (!this.wallet.isAuthenticated() && !this.wallet.bankConnected()) {
+        this.wallet.fetchRegisteredUsers();
+      }
+    }, 3500);
   }
 
   openNetModal(): void {

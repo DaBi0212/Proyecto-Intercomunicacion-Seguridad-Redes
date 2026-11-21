@@ -10,7 +10,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
   imports: [FormsModule, SfSymbolComponent],
   template: `
     <div class="auth-page">
-      <!-- Barra superior minimalista con estado de conexión al Banco Central y control de tema -->
+      <!-- Barra superior minimalista con estado de conexión automática al Banco Central y control de tema -->
       <header class="auth-topbar">
         <div class="topbar-left">
           <div class="topbar-badge continuous">
@@ -18,22 +18,19 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             <span>Multi-Usuario · Verificación Bancaria en Vivo</span>
           </div>
 
-          <button
-            type="button"
-            class="topbar-badge net-btn continuous apple-pressable"
+          <div
+            class="topbar-badge net-btn continuous"
             [class.ok]="market.bankConnected()"
-            (click)="openNetConfig()"
           >
             <span class="net-dot"></span>
             <span>
               {{
                 market.bankConnected()
-                  ? 'Banco Central Conectado (' + market.activeBankUrl() + ')'
-                  : 'Configurar IP Banco Central (:5050)'
+                  ? 'Banco Central Conectado Automáticamente'
+                  : 'Conectando Automáticamente con Banco Central…'
               }}
             </span>
-            <sf-symbol name="gearshape.fill" [size]="13" />
-          </button>
+          </div>
         </div>
 
         <button
@@ -45,35 +42,6 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
           <sf-symbol name="circle.lefthalf.filled" [size]="20" />
         </button>
       </header>
-
-      @if (netConfigOpen()) {
-        <div class="net-config-bar continuous">
-          <div class="ncb-copy">
-            <strong>Dirección IP del Servidor CentralBank.exe (:5050)</strong>
-            <span>Ingresa la IP Wi-Fi de la PC donde corre CentralBank (ej. http://192.168.1.74:5050/api o http://localhost:5050/api):</span>
-          </div>
-          <div class="ncb-controls">
-            <input
-              type="text"
-              class="ncb-input"
-              placeholder="http://192.168.1.74:5050/api"
-              [(ngModel)]="bankUrlInput"
-            />
-            <button type="button" class="ncb-preset" (click)="bankUrlInput = 'http://192.168.1.74:5050/api'">
-              192.168.1.74
-            </button>
-            <button type="button" class="ncb-preset" (click)="bankUrlInput = 'http://localhost:5050/api'">
-              localhost
-            </button>
-            <button type="button" class="ncb-save apple-pressable" (click)="saveNetConfig()">
-              Conectar
-            </button>
-          </div>
-          @if (netConfigMsg()) {
-            <span class="ncb-msg" [class.ok]="market.bankConnected()">{{ netConfigMsg() }}</span>
-          }
-        </div>
-      }
 
       <main class="auth-grid">
         <!-- Columna izquierda (en Desktop): Contexto del Ecosistema MarketStore + WalletPay -->
