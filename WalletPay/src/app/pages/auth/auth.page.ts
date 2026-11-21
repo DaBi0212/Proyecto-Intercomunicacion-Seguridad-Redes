@@ -36,11 +36,8 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
         </header>
 
         <section class="brand">
-          <div class="app-icon continuous" aria-hidden="true">
-            <span class="pass p1"></span>
-            <span class="pass p2"></span>
-            <span class="pass p3"></span>
-            <span class="pocket"></span>
+          <div class="app-icon-img-wrap" aria-hidden="true">
+            <img src="assets/walletpay-icon.png" alt="WalletPay" class="app-icon-img" />
           </div>
           <h1>WalletPay</h1>
           <p>Bóveda móvil de tickets del Banco Central sincronizada con MarketStore en Vercel.</p>
@@ -250,35 +247,20 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       padding: 4px 28px 4px;
     }
 
-    .app-icon {
-      --r: 22px;
-      position: relative;
-      width: 80px;
-      height: 80px;
+    .app-icon-img-wrap {
+      width: 88px;
+      height: 88px;
       margin-bottom: 12px;
-      overflow: hidden;
-      background: linear-gradient(180deg, #2C2C2E 0%, #000 100%);
-      box-shadow: var(--ios-shadow-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 10px 22px rgba(32, 77, 197, 0.34));
     }
-    .pass {
-      position: absolute;
-      left: 14px;
-      right: 14px;
-      height: 22px;
-      border-radius: 5px;
-    }
-    .p1 { top: 13px; background: #0A84FF; }
-    .p2 { top: 23px; background: #FF9F0A; }
-    .p3 { top: 33px; background: #30D158; }
-    .pocket {
-      position: absolute;
-      left: 10px;
-      right: 10px;
-      bottom: 10px;
-      height: 30px;
-      border-radius: 8px;
-      background: #3A3A3C;
-      box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.5);
+    .app-icon-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
 
     h1 {
