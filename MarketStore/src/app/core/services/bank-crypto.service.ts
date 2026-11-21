@@ -3,15 +3,6 @@ import * as forge from 'node-forge';
 import { environment } from '../../../environments/environment';
 import { BankTicket, OrderReceipt } from '../models/market.models';
 
-/**
- * Canal de comunicación seguro entre MarketStore y el Banco Central.
- *
- *  - Negocia una llave de sesión efímera protegida con la llave pública del banco.
- *  - Cifra y autentica cada mensaje con AES-256-GCM (etiqueta de 128 bits y AAD = sessionId),
- *    más nonce único y marca de tiempo contra ataques de reenvío.
- *  - Verifica la firma digital del banco en cada ticket y en cada comprobante de aprobación
- *    antes de que la tienda acepte o libere una compra.
- */
 @Injectable({
   providedIn: 'root'
 })
@@ -24,24 +15,114 @@ export class BankCryptoService {
   private handshakePromise: Promise<void> | null = null;
   private localVaultKeyBytes = '';
 
+  constructor() {
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const bankFromQuery = params.get('bank');
+      if (bankFromQuery) {
+        this.setCustomBankUrl(bankFromQuery);
+      }
+    }
+  }
+
+  static normalizeBankApiUrl(raw: string): string {
+    let clean = (raw || '').trim();
+    if (!clean) return '';
+    if (!/^https?:\/\//i.test(clean)) {
+      clean = `http://${clean}`;
+    }
+    clean = clean.replace(/\/+$/, '');
+    try {
+      const u = new URL(clean);
+      if (!u.port && u.protocol === 'http:' && (/^\d+\.\d+\.\d+\.\d+$/.test(u.hostname) || u.hostname === 'localhost')) {
+        u.port = '5050';
+      }
+      if (!u.pathname || u.pathname === '/') {
+        u.pathname = '/api';
+      } else if (!u.pathname.endsWith('/api')) {
+        u.pathname = u.pathname.replace(/\/+$/, '') + '/api';
+      }
+      return u.toString().replace(/\/+$/, '');
+    } catch {
+      if (!clean.includes(':5050') && !clean.startsWith('https://')) {
+        clean += ':5050';
+      }
+      if (!clean.endsWith('/api')) {
+        clean += '/api';
+      }
+      return clean;
+    }
+  }
+
+  getCustomBankUrl(): string {
+    return localStorage.getItem('ms_custom_bank_url') || environment.bankApiUrl;
+  }
+
+  setCustomBankUrl(rawUrl: string): string {
+    const normalized = BankCryptoService.normalizeBankApiUrl(rawUrl);
+    if (normalized) {
+      localStorage.setItem('ms_custom_bank_url', normalized);
+    } else {
+      localStorage.removeItem('ms_custom_bank_url');
+    }
+    this.resetChannel();
+    this.activeBaseUrl = '';
+    return normalized || environment.bankApiUrl;
+  }
+
+  getActiveBankUrl(): string {
+    return this.activeBaseUrl || this.getCustomBankUrl() || environment.bankApiUrl;
+  }
+
   private getCandidateApiUrls(): string[] {
     const urls = new Set<string>();
-    if (typeof window !== 'undefined' && window.location?.hostname) {
-      const host = window.location.hostname;
-      if (host !== 'localhost' && host !== '127.0.0.1') {
-        urls.add(`http://${host}:5050/api`);
-      }
+    const custom = localStorage.getItem('ms_custom_bank_url');
+    if (custom) {
+      urls.add(BankCryptoService.normalizeBankApiUrl(custom));
     }
     urls.add('http://localhost:5050/api');
     urls.add('http://127.0.0.1:5050/api');
     urls.add(environment.bankApiUrl);
-    urls.add('http://192.168.1.218:5050/api');
-    return Array.from(urls);
+    urls.add('http://192.168.1.74:5050/api');
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      const host = window.location.hostname;
+      if (host !== 'localhost' && host !== '127.0.0.1' && !host.includes('vercel.app')) {
+        urls.add(`http://${host}:5050/api`);
+      }
+    }
+    return Array.from(urls).filter((u) => !!u);
   }
 
-  // =========================================================================
-  // FORMAS CANÓNICAS Y VERIFICACIÓN DE FIRMAS DEL BANCO CENTRAL
-  // =========================================================================
+  private async fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 2600): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async testConnection(): Promise<{ ok: boolean; activeUrl: string; lanIp?: string; error?: string }> {
+    try {
+      this.resetChannel();
+      this.activeBaseUrl = '';
+      await this.ensureChannel();
+      const healthResp = await this.fetchWithTimeout(`${this.activeBaseUrl}/health`, undefined, 2200).catch(() => null);
+      const health = healthResp ? await healthResp.json().catch(() => null) : null;
+      return {
+        ok: true,
+        activeUrl: this.activeBaseUrl,
+        lanIp: health?.lanIp
+      };
+    } catch {
+      return {
+        ok: false,
+        activeUrl: this.getCustomBankUrl(),
+        error: 'No se pudo conectar con CentralBank (:5050). Asegúrate de que CentralBank.exe esté abierto y que la IP coincida.'
+      };
+    }
+  }
 
   static ticketCanonical(id: string, amount: number, ownerEmail: string, issuedEpoch: number): string {
     return `TKT1|${id}|${amount}|${(ownerEmail || '').trim().toLowerCase()}|${issuedEpoch}`;
@@ -81,10 +162,6 @@ export class BankCryptoService {
     }
   }
 
-  /**
-   * Comprueba en la tienda que un ticket no haya sido modificado (folio, monto, titular o fecha)
-   * y que su firma corresponda a la llave del Banco Central.
-   */
   isTicketAuthentic(ticket: BankTicket): boolean {
     if (!ticket || !ticket.id || !ticket.signature || !ticket.issuedEpoch || !ticket.ownerEmail) {
       return false;
@@ -102,10 +179,6 @@ export class BankCryptoService {
     return this.verifyBankSignature(canonical, ticket.signature);
   }
 
-  /**
-   * Comprueba que el comprobante de aprobación recibido para una orden fue firmado por el Banco Central
-   * para esa orden, ese monto y esos tickets exactos.
-   */
   isOrderReceiptAuthentic(
     receipt: OrderReceipt | undefined,
     expectedOrderId: string,
@@ -134,10 +207,6 @@ export class BankCryptoService {
     return this.verifyBankSignature(canonical, receipt.signature);
   }
 
-  // =========================================================================
-  // APERTURA DE CANAL Y TRANSPORTE PROTEGIDO
-  // =========================================================================
-
   resetChannel(): void {
     this.sessionId = '';
     this.sessionKeyBytes = '';
@@ -160,7 +229,7 @@ export class BankCryptoService {
     let lastError: unknown;
     for (const base of this.getCandidateApiUrls()) {
       try {
-        const infoResp = await fetch(`${base}/channel/info`);
+        const infoResp = await this.fetchWithTimeout(`${base}/channel/info`, undefined, 2600);
         if (!infoResp.ok) continue;
         const info = await infoResp.json();
         if (!info.ok || !info.publicKey) continue;
@@ -187,15 +256,19 @@ export class BankCryptoService {
           mgf1: { md: forge.md.sha256.create() }
         });
 
-        const openResp = await fetch(`${base}/channel/open`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            wrappedKey: forge.util.encode64(wrappedBytes),
-            client: 'MarketStore',
-            clientNonce
-          })
-        });
+        const openResp = await this.fetchWithTimeout(
+          `${base}/channel/open`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              wrappedKey: forge.util.encode64(wrappedBytes),
+              client: 'MarketStore',
+              clientNonce
+            })
+          },
+          2600
+        );
         if (!openResp.ok) continue;
         const openData = await openResp.json();
         if (!openData.ok || !openData.sessionId || !openData.iv || !openData.data) continue;

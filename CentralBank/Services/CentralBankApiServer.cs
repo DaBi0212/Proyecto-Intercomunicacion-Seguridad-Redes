@@ -40,6 +40,29 @@ public class CentralBankApiServer : IDisposable
 
     public string BaseUrl { get; } = "http://0.0.0.0:5050/";
 
+    public static string GetLocalLanIp()
+    {
+        try
+        {
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            var candidates = host.AddressList
+                .Where(ip => ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
+                .Select(ip => ip.ToString())
+                .ToList();
+
+            var wifiLan = candidates.FirstOrDefault(ip =>
+                ip.StartsWith("192.168.1.", StringComparison.Ordinal) ||
+                ip.StartsWith("192.168.0.", StringComparison.Ordinal) ||
+                ip.StartsWith("10.", StringComparison.Ordinal));
+
+            return wifiLan ?? candidates.FirstOrDefault() ?? "127.0.0.1";
+        }
+        catch
+        {
+            return "192.168.1.74";
+        }
+    }
+
     public CentralBankApiServer(CentralBankStateService state)
     {
         _state = state;
@@ -216,8 +239,10 @@ public class CentralBankApiServer : IDisposable
                 {
                     ok = true,
                     service = "CentralBank Desktop Node",
+                    lanIp = GetLocalLanIp(),
                     totalTickets = _state.TotalTicketsSoldCount,
-                    pendingOrders = _state.PendingOrdersCount
+                    pendingOrders = _state.PendingOrdersCount,
+                    pendingTicketRequests = _state.PendingTicketRequestsCount
                 });
                 return;
             }
@@ -613,10 +638,15 @@ public class CentralBankApiServer : IDisposable
                     return (401, new { ok = false, code = "UNAUTHORIZED", error = "Cuenta no encontrada." });
 
                 var isSeller = session.Role == "seller";
-                // Un comprador solo recibe SUS tickets, transacciones y órdenes; nunca los de otros clientes.
+                // Un comprador recibe SUS tickets y aquellos que un amigo le haya compartido vía QR.
                 var tickets = _state.Tickets
-                    .Where(t => t.OwnerEmail.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
-                    .Select(MapTicketForFrontend)
+                    .Where(t => t.CanBeAccessedBy(user.Email))
+                    .Select(t => MapTicketForFrontend(t, user.Email))
+                    .ToList();
+
+                var ticketRequests = _state.TicketRequests
+                    .Where(r => r.UserEmail.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+                    .Select(MapTicketRequestForFrontend)
                     .ToList();
 
                 var txs = _state.Transactions
@@ -637,18 +667,20 @@ public class CentralBankApiServer : IDisposable
                     user = MapUserForFrontend(user),
                     users = _state.Users.Select(MapUserForDirectory).ToList(),
                     tickets,
+                    ticketRequests,
                     transactions = txs,
                     orders
                 });
             }
 
             case "tickets.purchase":
+            case "tickets.purchase.request":
             {
                 if (!session.IsAuthenticated || session.UserEmail == null)
                     return (401, new { ok = false, code = "UNAUTHORIZED", error = "Inicia sesión para adquirir tickets." });
 
                 var amount = GetIntProp(payload, "amount", 0);
-                var paymentMethod = GetStringProp(payload, "paymentMethod", "Tarjeta");
+                var paymentMethod = GetStringProp(payload, "paymentMethod", "Tarjeta de Débito/Crédito Visa •••• 4821");
 
                 if (!CentralBankStateService.AllowedDenominations.Contains(amount))
                 {
@@ -661,15 +693,77 @@ public class CentralBankApiServer : IDisposable
                     });
                 }
 
-                // El titular siempre se toma de la sesión autenticada, nunca del cuerpo enviado por el cliente.
-                var createdTicket = _state.PurchaseTicketForUser(session.UserEmail, amount, paymentMethod);
-                var createdTx = _state.Transactions.FirstOrDefault(tx => tx.Id == createdTicket.PurchaseTransactionId);
+                // Toda compra de ticket pasa por la validación y aprobación de tarjeta del Administrador del Banco Central
+                var pendingReq = _state.CreatePendingTicketPurchaseRequest(session.UserEmail, amount, paymentMethod);
 
                 return (200, new
                 {
                     ok = true,
-                    ticket = MapTicketForFrontend(createdTicket),
+                    pendingApproval = true,
+                    requestId = pendingReq.RequestId,
+                    approvalStatus = pendingReq.ApprovalStatus,
+                    request = MapTicketRequestForFrontend(pendingReq),
+                    message = "Solicitud enviada al Banco Central. Esperando aprobación del pago con tarjeta por el Administrador."
+                });
+            }
+
+            case "tickets.purchase.status":
+            {
+                if (!session.IsAuthenticated || session.UserEmail == null)
+                    return (401, new { ok = false, code = "UNAUTHORIZED", error = "Sesión no autenticada." });
+
+                var requestId = GetStringProp(payload, "requestId", "").Trim().ToUpperInvariant();
+                _state.ReloadFromDatabase();
+                var req = _state.TicketRequests.FirstOrDefault(r =>
+                    r.RequestId.Equals(requestId, StringComparison.OrdinalIgnoreCase) &&
+                    r.UserEmail.Equals(session.UserEmail, StringComparison.OrdinalIgnoreCase));
+
+                if (req == null)
+                {
+                    return (404, new { ok = false, code = "REQUEST_NOT_FOUND", error = "Solicitud de compra de ticket no encontrada." });
+                }
+
+                var mintedTicket = !string.IsNullOrEmpty(req.MintedTicketId)
+                    ? _state.Tickets.FirstOrDefault(t => t.Id == req.MintedTicketId)
+                    : null;
+
+                var createdTx = mintedTicket != null
+                    ? _state.Transactions.FirstOrDefault(tx => tx.Id == mintedTicket.PurchaseTransactionId)
+                    : null;
+
+                return (200, new
+                {
+                    ok = true,
+                    requestId = req.RequestId,
+                    approvalStatus = req.ApprovalStatus,
+                    statusReport = req.StatusReport,
+                    bankAuthCode = req.BankAuthCode,
+                    mintedTicketId = req.MintedTicketId,
+                    request = MapTicketRequestForFrontend(req),
+                    ticket = mintedTicket != null ? MapTicketForFrontend(mintedTicket, session.UserEmail) : null,
                     transaction = createdTx != null ? MapTxForWalletPay(createdTx) : null
+                });
+            }
+
+            case "tickets.share.scan":
+            {
+                if (!session.IsAuthenticated || session.UserEmail == null)
+                    return (401, new { ok = false, code = "UNAUTHORIZED", error = "Inicia sesión para escanear el código QR de un ticket." });
+
+                var qrData = GetStringProp(payload, "qrData", "");
+                if (string.IsNullOrWhiteSpace(qrData))
+                {
+                    qrData = GetStringProp(payload, "folio", "");
+                }
+
+                var (ok, code, msg, sharedTk) = _state.ShareTicketViaQrScan(session.UserEmail, qrData);
+                return (200, new
+                {
+                    ok,
+                    code,
+                    message = msg,
+                    error = ok ? "" : msg,
+                    ticket = sharedTk != null ? MapTicketForFrontend(sharedTk, session.UserEmail) : null
                 });
             }
 
@@ -723,24 +817,25 @@ public class CentralBankApiServer : IDisposable
                     }
                 }
 
-                if (session.Role != "seller" && !found.OwnerEmail.Equals(session.UserEmail, StringComparison.OrdinalIgnoreCase))
+                if (session.Role != "seller" && !found.CanBeAccessedBy(session.UserEmail))
                 {
                     return (200, new
                     {
                         ok = false,
                         code = "NOT_TICKET_OWNER",
-                        message = $"El ticket {found.Id} pertenece a otra cuenta."
+                        message = $"El ticket {found.Id} pertenece a otra cuenta ({found.OwnerName}) y no ha sido compartido contigo."
                     });
                 }
 
                 if (found.Status == TicketStatus.Used)
                 {
+                    var usedBy = found.UsedByName ?? found.OwnerName;
                     return (200, new
                     {
                         ok = false,
                         code = "TICKET_ALREADY_USED",
-                        message = $"El ticket {found.Id} ya fue utilizado en la orden #{found.OrderId} y no puede volver a usarse.",
-                        ticket = MapTicketForFrontend(found)
+                        message = $"ALERTA ANTI-DOBLE GASTO: El ticket {found.Id} ya fue utilizado por {usedBy} en la orden #{found.OrderId} y no puede volver a usarse.",
+                        ticket = MapTicketForFrontend(found, session.UserEmail)
                     });
                 }
 
@@ -749,7 +844,7 @@ public class CentralBankApiServer : IDisposable
                     ok = true,
                     code = "TICKET_VALID",
                     message = $"Ticket {found.Id} (${found.Amount} MXN) verificado ante el Banco Central.",
-                    ticket = MapTicketForFrontend(found)
+                    ticket = MapTicketForFrontend(found, session.UserEmail)
                 });
             }
 
@@ -854,8 +949,13 @@ public class CentralBankApiServer : IDisposable
     private object BuildAuthenticatedBundle(BankUser user, string? deviceToken)
     {
         var userTickets = _state.Tickets
-            .Where(t => t.OwnerEmail.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
-            .Select(MapTicketForFrontend)
+            .Where(t => t.CanBeAccessedBy(user.Email))
+            .Select(t => MapTicketForFrontend(t, user.Email))
+            .ToList();
+
+        var userTicketRequests = _state.TicketRequests
+            .Where(r => r.UserEmail.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+            .Select(MapTicketRequestForFrontend)
             .ToList();
 
         var userTxs = _state.Transactions
@@ -870,6 +970,7 @@ public class CentralBankApiServer : IDisposable
             user = MapUserForFrontend(user),
             users = _state.Users.Select(MapUserForDirectory).ToList(),
             tickets = userTickets,
+            ticketRequests = userTicketRequests,
             transactions = userTxs
         };
     }
@@ -903,23 +1004,48 @@ public class CentralBankApiServer : IDisposable
         totalCapitalContributed = u.TotalCapitalContributed
     };
 
-    private static object MapTicketForFrontend(BankTicketRecord t) => new
+    private static object MapTicketForFrontend(BankTicketRecord t, string? viewerEmail = null)
     {
-        id = t.Id,
-        serialMasked = t.SerialMasked,
-        amount = t.Amount,
-        tier = t.Tier,
-        colorClass = t.ColorClass,
-        status = t.Status == TicketStatus.Used ? "used" : "active",
-        issuedAt = $"{t.PurchaseDate}, {t.PurchaseTime}",
-        issuedEpoch = t.IssuedEpoch,
-        usedAt = t.IsUsed ? $"{t.UsedDate}, {t.UsedTime}" : null,
-        orderId = t.OrderId,
-        signatureHash = t.SignatureHash,
-        signature = t.Signature,
-        qrRevealed = false,
-        ownerName = t.OwnerName,
-        ownerEmail = t.OwnerEmail
+        var isSharedWithViewer = !string.IsNullOrWhiteSpace(viewerEmail) &&
+                                 !t.OwnerEmail.Equals(viewerEmail, StringComparison.OrdinalIgnoreCase);
+        return new
+        {
+            id = t.Id,
+            serialMasked = t.SerialMasked,
+            amount = t.Amount,
+            tier = t.Tier,
+            colorClass = t.ColorClass,
+            status = t.Status == TicketStatus.Used ? "used" : "active",
+            issuedAt = $"{t.PurchaseDate}, {t.PurchaseTime}",
+            issuedEpoch = t.IssuedEpoch,
+            usedAt = t.IsUsed ? $"{t.UsedDate}, {t.UsedTime}" : null,
+            usedByName = t.UsedByName,
+            usedByEmail = t.UsedByEmail,
+            orderId = t.OrderId,
+            signatureHash = t.SignatureHash,
+            signature = t.Signature,
+            qrRevealed = false,
+            ownerName = t.OwnerName,
+            ownerEmail = t.OwnerEmail,
+            isShared = t.IsShared,
+            isSharedWithMe = isSharedWithViewer,
+            sharedWithEmails = t.GetSharedEmailsList(),
+            qrPayload = $"WPTKT1|{t.Id}|{t.Amount}|{t.OwnerEmail}|{t.IssuedEpoch}|{t.SignatureHash}"
+        };
+    }
+
+    private static object MapTicketRequestForFrontend(PendingTicketPurchaseRecord r) => new
+    {
+        requestId = r.RequestId,
+        amount = r.Amount,
+        tier = r.Tier,
+        colorClass = r.ColorClass,
+        paymentMethod = r.PaymentMethod,
+        createdAt = $"{r.CreatedDate}, {r.CreatedTime}",
+        approvalStatus = r.ApprovalStatus,
+        mintedTicketId = r.MintedTicketId,
+        bankAuthCode = r.BankAuthCode,
+        statusReport = r.StatusReport
     };
 
     private static object MapTxForWalletPay(BankTransactionRecord tx) => new
@@ -1037,7 +1163,8 @@ public class CentralBankApiServer : IDisposable
         headerSb.Append($"Content-Length: {bodyBytes.Length}\r\n");
         headerSb.Append("Access-Control-Allow-Origin: *\r\n");
         headerSb.Append("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
-        headerSb.Append("Access-Control-Allow-Headers: Content-Type, Authorization, X-Client-Platform\r\n");
+        headerSb.Append("Access-Control-Allow-Headers: Content-Type, Authorization, X-Client-Platform, Access-Control-Request-Private-Network\r\n");
+        headerSb.Append("Access-Control-Allow-Private-Network: true\r\n");
         headerSb.Append("Cache-Control: no-store\r\n");
         headerSb.Append("Connection: close\r\n\r\n");
 

@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { MarketStateService } from '../../core/services/market-state.service';
 import { BankTicket, TicketDenomination } from '../../core/models/market.models';
 import { SfSymbolComponent } from '../../shared/sf-symbol.component';
+import { generateQrSvgData } from '../../core/utils/qr-generator';
 
 interface DenominationCard {
   amount: TicketDenomination;
@@ -197,32 +198,18 @@ interface DenominationCard {
                   (click)="market.toggleTicketQrReveal(t.id)"
                 >
                   <div class="qr-frame">
+                    @let qrSvg = getQrSvgForTicket(t);
                     <svg
                       class="qr-code"
                       [class.blurred]="!t.qrRevealed"
-                      viewBox="0 0 84 84"
+                      [attr.viewBox]="qrSvg.viewBox"
                       width="60"
                       height="60"
+                      shape-rendering="crispEdges"
                       aria-hidden="true"
                     >
-                      <rect x="6" y="6" width="20" height="20" rx="3" fill="#000"/>
-                      <rect x="10" y="10" width="12" height="12" rx="1.5" fill="#fff"/>
-                      <rect x="13" y="13" width="6" height="6" fill="#000"/>
-                      <rect x="58" y="6" width="20" height="20" rx="3" fill="#000"/>
-                      <rect x="62" y="10" width="12" height="12" rx="1.5" fill="#fff"/>
-                      <rect x="65" y="13" width="6" height="6" fill="#000"/>
-                      <rect x="6" y="58" width="20" height="20" rx="3" fill="#000"/>
-                      <rect x="10" y="62" width="12" height="12" rx="1.5" fill="#fff"/>
-                      <rect x="13" y="65" width="6" height="6" fill="#000"/>
-                      <rect x="32" y="10" width="8" height="8" rx="1.5" fill="#000"/>
-                      <rect x="44" y="16" width="8" height="8" rx="1.5" fill="#000"/>
-                      <rect x="30" y="30" width="14" height="14" rx="2" fill="#000"/>
-                      <rect x="48" y="34" width="10" height="10" rx="1.5" fill="#000"/>
-                      <rect x="14" y="36" width="10" height="10" rx="1.5" fill="#000"/>
-                      <rect x="62" y="38" width="12" height="12" rx="2" fill="#000"/>
-                      <rect x="34" y="52" width="12" height="12" rx="2" fill="#000"/>
-                      <rect x="52" y="56" width="10" height="10" rx="1.5" fill="#000"/>
-                      <rect x="66" y="64" width="12" height="12" rx="2" fill="#000"/>
+                      <rect width="100%" height="100%" fill="#fff" />
+                      <path [attr.d]="qrSvg.path" fill="#000" />
                     </svg>
                     @if (!t.qrRevealed) {
                       <span class="qr-lock">
@@ -810,6 +797,18 @@ export class WalletPage {
   externalFolio = '';
   externalDenom: TicketDenomination = 100;
   readonly importFeedback = signal<string>('');
+  private qrSvgCache = new Map<string, { viewBox: string; path: string; size: number }>();
+
+  getQrSvgForTicket(t: BankTicket): { viewBox: string; path: string; size: number } {
+    const payload =
+      t.qrPayload ||
+      `WPTKT1|${t.id}|${t.amount}|${t.ownerEmail || ''}|${t.issuedEpoch || 0}|${t.signatureHash}`;
+    const cached = this.qrSvgCache.get(payload);
+    if (cached) return cached;
+    const generated = generateQrSvgData(payload);
+    this.qrSvgCache.set(payload, generated);
+    return generated;
+  }
 
   readonly denominations: DenominationCard[] = [
     {
@@ -869,8 +868,20 @@ export class WalletPage {
   }
 
   async purchaseDenomination(d: DenominationCard): Promise<void> {
-    await this.market.acquireBankTicket(d.amount, 'Compra directa en MarketStore');
-    this.segment.set('active');
+    try {
+      this.importFeedback.set(
+        `Solicitando Ticket $${d.amount} MXN · Esperando aprobación del pago con tarjeta en CentralBank Desktop...`
+      );
+      await this.market.acquireBankTicket(
+        d.amount,
+        'Tarjeta Visa •••• 4821 (MarketStore)',
+        (msg) => this.importFeedback.set(msg)
+      );
+      this.importFeedback.set(`¡Pago aprobado por el Banco Central! Ticket de $${d.amount} MXN emitido.`);
+      this.segment.set('active');
+    } catch (err: any) {
+      this.importFeedback.set(err?.message || 'El pago con tarjeta fue rechazado por el Banco Central.');
+    }
   }
 }
 

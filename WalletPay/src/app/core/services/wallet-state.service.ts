@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import {
   BankTicket,
   TicketDenomination,
+  TicketPurchaseRequest,
   WalletTransaction,
   AuditLogItem,
   WalletUserAccount
@@ -20,6 +21,11 @@ export class WalletStateService {
   readonly currentUserEmail = signal<string>('');
   readonly currentUserName = signal<string>('');
   readonly registeredUsers = signal<WalletUserAccount[]>([]);
+
+  readonly bankConnected = signal<boolean>(false);
+  readonly activeBankUrl = signal<string>(environment.bankApiUrl);
+  readonly activeStoreUrl = signal<string>(environment.marketStoreUrl);
+  readonly networkModalOpen = signal<boolean>(false);
 
   readonly currentUserInitials = computed(() => {
     const name = this.currentUserName().trim();
@@ -49,11 +55,15 @@ export class WalletStateService {
 
   // Todo proviene en tiempo real del Banco Central y se verifica antes de aceptarse
   readonly tickets = signal<BankTicket[]>([]);
+  readonly ticketRequests = signal<TicketPurchaseRequest[]>([]);
   readonly transactions = signal<WalletTransaction[]>([]);
   readonly auditLogs = signal<AuditLogItem[]>([]);
 
   readonly activeTickets = computed(() => this.tickets().filter((t) => t.status === 'active'));
   readonly usedTickets = computed(() => this.tickets().filter((t) => t.status === 'used'));
+  readonly pendingTicketRequests = computed(() =>
+    this.ticketRequests().filter((r) => r.approvalStatus === 'pending')
+  );
   readonly availableBalance = computed(() =>
     this.activeTickets().reduce((acc, t) => acc + t.amount, 0)
   );
@@ -72,14 +82,38 @@ export class WalletStateService {
 
   constructor(
     private router: Router,
-    private crypto: BankCryptoService
+    public crypto: BankCryptoService
   ) {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     this.applyTheme(media.matches);
     media.addEventListener('change', (e) => {
       if (!this.themeOverridden) this.applyTheme(e.matches);
     });
+    this.activeBankUrl.set(this.crypto.getCustomBankUrl());
+    this.activeStoreUrl.set(this.crypto.getMarketStoreUrl());
     this.fetchRegisteredUsers();
+  }
+
+  async saveNetworkSettings(bankUrl: string, storeUrl: string): Promise<{ ok: boolean; message: string }> {
+    const normBank = this.crypto.setCustomBankUrl(bankUrl);
+    const normStore = this.crypto.setMarketStoreUrl(storeUrl);
+    this.activeBankUrl.set(normBank);
+    this.activeStoreUrl.set(normStore);
+
+    const probe = await this.crypto.testConnection();
+    this.bankConnected.set(probe.ok);
+    if (probe.ok) {
+      this.activeBankUrl.set(probe.activeUrl);
+      await this.fetchRegisteredUsers();
+      return {
+        ok: true,
+        message: `Conectado exitosamente a CentralBank en ${probe.activeUrl}`
+      };
+    }
+    return {
+      ok: false,
+      message: probe.error || 'No se pudo conectar con CentralBank en esa dirección IP.'
+    };
   }
 
   toggleTheme(): void {
@@ -131,9 +165,11 @@ export class WalletStateService {
       const data = await this.crypto.request('directory.list');
       if (data?.ok && Array.isArray(data.users)) {
         this.registeredUsers.set(data.users);
+        this.bankConnected.set(true);
+        this.activeBankUrl.set(this.crypto.getActiveBankUrl());
       }
     } catch {
-      // CentralBank puede no estar iniciado aún
+      this.bankConnected.set(false);
     }
   }
 
@@ -217,11 +253,15 @@ export class WalletStateService {
         this.crypto.saveProtectedItem(`devpass_${email}`, data.deviceToken);
       }
 
+      this.bankConnected.set(true);
+      this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+
       const resolvedName = data.user?.name || params.name?.trim() || email.split('@')[0];
       this.currentUserEmail.set(email);
       this.currentUserName.set(resolvedName);
       if (Array.isArray(data.users)) this.registeredUsers.set(data.users);
       if (Array.isArray(data.tickets)) this.tickets.set(this.filterAuthenticTickets(data.tickets));
+      if (Array.isArray(data.ticketRequests)) this.ticketRequests.set(data.ticketRequests);
       if (Array.isArray(data.transactions)) this.transactions.set(data.transactions);
 
       await this.triggerBiometricPulse(`Hola, ${resolvedName.split(' ')[0]}`, 850);
@@ -233,10 +273,11 @@ export class WalletStateService {
       this.router.navigateByUrl('/tabs/store');
       return { ok: true };
     } catch {
+      this.bankConnected.set(false);
       this.addAuditLog('warn', 'No se pudo conectar con CentralBank (:5050).');
       return {
         ok: false,
-        error: 'No se pudo conectar con el Banco Central (:5050). Asegúrate de que CentralBank esté abierto.'
+        error: `No se pudo conectar con CentralBank (${this.crypto.getCustomBankUrl()}). Verifica que CentralBank.exe esté abierto o configura la IP del servidor.`
       };
     }
   }
@@ -263,6 +304,9 @@ export class WalletStateService {
         return;
       }
 
+      this.bankConnected.set(true);
+      this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+
       if (Array.isArray(data.users)) {
         this.registeredUsers.set(data.users);
       }
@@ -281,6 +325,10 @@ export class WalletStateService {
         this.tickets.set(verified);
       }
 
+      if (Array.isArray(data.ticketRequests)) {
+        this.ticketRequests.set(data.ticketRequests);
+      }
+
       if (Array.isArray(data.transactions)) {
         this.transactions.set(data.transactions);
       }
@@ -294,6 +342,7 @@ export class WalletStateService {
     this.jwtToken = null;
     this.isAuthenticated.set(false);
     this.tickets.set([]);
+    this.ticketRequests.set([]);
     this.transactions.set([]);
     if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
     if (this.syncPollingTimer) clearInterval(this.syncPollingTimer);
@@ -311,31 +360,183 @@ export class WalletStateService {
     }, environment.sessionTimeoutMs);
   }
 
-  async purchaseAndMintTicket(
+  /**
+   * Solicita al Banco Central la compra de un ticket con tarjeta.
+   * El Administrador del Banco Central debe aceptar o rechazar el pago en CentralBank Desktop.
+   */
+  async requestAndWaitTicketPurchaseApproval(
     amount: TicketDenomination,
-    _tier: string,
-    _colorClass: string,
-    paymentMethod: string
-  ): Promise<BankTicket> {
+    paymentMethod: string,
+    onProgress?: (statusText: string, requestId?: string) => void,
+    shouldCancel?: () => boolean
+  ): Promise<{ ok: boolean; ticket?: BankTicket; requestId?: string; error?: string }> {
     this.resetInactivityWatchdog();
-    await this.triggerBiometricPulse('Emitiendo con Banco Central...', 950);
+    await this.triggerBiometricPulse('Enviando pago al Banco Central...', 800);
 
-    const data = await this.crypto.request('tickets.purchase', {
-      amount,
-      paymentMethod
-    });
+    let requestId = '';
+    try {
+      const data = await this.crypto.request('tickets.purchase.request', {
+        amount,
+        paymentMethod
+      });
 
-    if (!data?.ok || !data.ticket) {
-      throw new Error(data?.error || 'El Banco Central rechazó la emisión del ticket.');
+      if (!data?.ok) {
+        return {
+          ok: false,
+          error: data?.error || 'El Banco Central rechazó la solicitud de compra.'
+        };
+      }
+
+      // Si el servidor emitió directamente (compatibilidad)
+      if (data.ticket && !data.pendingApproval) {
+        const minted = data.ticket as BankTicket;
+        if (!this.crypto.isTicketAuthentic(minted)) {
+          return { ok: false, error: 'El ticket recibido no superó la validación de autenticidad.' };
+        }
+        await this.syncWithCentralBank();
+        return { ok: true, ticket: minted };
+      }
+
+      requestId = data.requestId;
+      await this.syncWithCentralBank();
+    } catch {
+      return {
+        ok: false,
+        error: 'No se pudo conectar con CentralBank (:5050). Verifica que el software del banco esté abierto.'
+      };
     }
 
-    const minted = data.ticket as BankTicket;
-    if (!this.crypto.isTicketAuthentic(minted)) {
-      throw new Error('El ticket recibido no superó la validación de autenticidad.');
+    if (onProgress) {
+      onProgress(
+        `Solicitud #${requestId} recibida en CentralBank · Esperando que el Administrador del Banco acepte el pago de tu tarjeta (${paymentMethod})...`,
+        requestId
+      );
     }
 
-    await this.syncWithCentralBank();
-    return minted;
+    while (true) {
+      if (shouldCancel && shouldCancel()) {
+        return { ok: false, requestId, error: 'Espera en segundo plano. El ticket aparecerá en Mis Tickets cuando el Banco lo apruebe.' };
+      }
+
+      await new Promise((r) => setTimeout(r, 1200));
+
+      if (shouldCancel && shouldCancel()) {
+        return { ok: false, requestId, error: 'Espera en segundo plano.' };
+      }
+
+      try {
+        const statusData = await this.crypto.request('tickets.purchase.status', { requestId });
+        if (!statusData?.ok) continue;
+
+        if (statusData.approvalStatus === 'pending') {
+          if (onProgress) {
+            onProgress(
+              `Validando tarjeta en CentralBank Desktop (Solicitud #${requestId}) · En la pestaña "Aprobar Tarjetas y Compras", acepta o rechaza el pago...`,
+              requestId
+            );
+          }
+          continue;
+        }
+
+        if (statusData.approvalStatus === 'rejected') {
+          await this.syncWithCentralBank();
+          this.addAuditLog(
+            'warn',
+            `[Pago Rechazado] El Administrador del Banco Central rechazó la compra del ticket de $${amount} (#${requestId}).`
+          );
+          return {
+            ok: false,
+            requestId,
+            error: statusData.statusReport || 'El Administrador del Banco Central rechazó el pago de la tarjeta.'
+          };
+        }
+
+        if (statusData.approvalStatus === 'approved' && statusData.ticket) {
+          const minted = statusData.ticket as BankTicket;
+          if (!this.crypto.isTicketAuthentic(minted)) {
+            return {
+              ok: false,
+              requestId,
+              error: 'El ticket recibido no superó la validación criptográfica RSA-2048.'
+            };
+          }
+
+          await this.triggerBiometricPulse(`Ticket $${amount} Aprobado`, 800);
+          await this.syncWithCentralBank();
+          this.addAuditLog(
+            'bank',
+            `[Pago Aprobado] Solicitud #${requestId} autorizada (${statusData.bankAuthCode}). Ticket ${minted.id} ($${amount} MXN) emitido.`
+          );
+          return {
+            ok: true,
+            requestId,
+            ticket: minted
+          };
+        }
+      } catch {
+        // Continuar esperando si hubo micro-corte
+      }
+    }
+  }
+
+  /**
+   * Escanea el código QR del ticket de un amigo y lo vincula con validación anti-doble gasto en el Banco Central.
+   */
+  async scanAndClaimSharedTicket(rawQrData: string): Promise<{
+    ok: boolean;
+    code?: string;
+    message: string;
+    ticket?: BankTicket;
+  }> {
+    this.resetInactivityWatchdog();
+    const clean = (rawQrData || '').trim();
+    if (!clean) {
+      return { ok: false, message: 'No se detectó ningún código QR válido.' };
+    }
+
+    await this.triggerBiometricPulse('Verificando QR con Banco Central...', 750);
+
+    try {
+      const data = await this.crypto.request('tickets.share.scan', {
+        qrData: clean
+      });
+
+      if (!data?.ok) {
+        this.addAuditLog('warn', `[Escaneo QR Rechazado] ${data?.message || data?.error || 'Ticket inválido o ya usado'}.`);
+        await this.haptic('error');
+        return {
+          ok: false,
+          code: data?.code,
+          message: data?.message || data?.error || 'El Banco Central rechazó el ticket escaneado.'
+        };
+      }
+
+      if (data.ticket && !this.crypto.isTicketAuthentic(data.ticket)) {
+        await this.haptic('error');
+        return {
+          ok: false,
+          code: 'TICKET_TAMPERED',
+          message: 'El ticket escaneado tiene un sello alterado y fue rechazado por seguridad.'
+        };
+      }
+
+      await this.syncWithCentralBank();
+      this.addAuditLog('bank', `[Ticket Compartido por QR] ${data.message}`);
+      await this.haptic('success');
+
+      return {
+        ok: true,
+        code: data.code,
+        message: data.message,
+        ticket: data.ticket
+      };
+    } catch {
+      await this.haptic('error');
+      return {
+        ok: false,
+        message: 'No se pudo conectar con el Banco Central (:5050) para verificar el código QR.'
+      };
+    }
   }
 
   async redeemTicketWithBank(ticketId: string): Promise<boolean> {
@@ -345,19 +546,21 @@ export class WalletStateService {
 
   async redirectToMarketStoreWithTicket(ticketId?: string): Promise<void> {
     this.resetInactivityWatchdog();
+    const storeBase = this.crypto.getMarketStoreUrl();
+    const bankParam = `&bank=${encodeURIComponent(this.crypto.getActiveBankUrl())}`;
     const tkParam = ticketId ? `&ticketId=${encodeURIComponent(ticketId)}` : '';
 
     try {
       const res = await this.crypto.request('auth.handoff.create');
       if (res?.ok && res.handoffToken) {
-        const targetUrl = `${environment.marketStoreUrl}/catalog?handoff=${encodeURIComponent(res.handoffToken)}${tkParam}`;
+        const targetUrl = `${storeBase}/catalog?handoff=${encodeURIComponent(res.handoffToken)}${tkParam}${bankParam}`;
         window.open(targetUrl, '_blank');
         return;
       }
     } catch {
-      // Si el banco no pudo emitir el pase, abrir la pantalla de acceso de la tienda
+      // Si el banco no pudo emitir el pase, abrir la pantalla de acceso de la tienda con el parámetro bank
     }
-    window.open(`${environment.marketStoreUrl}/auth`, '_blank');
+    window.open(`${storeBase}/auth?bank=${encodeURIComponent(this.crypto.getActiveBankUrl())}`, '_blank');
   }
 
   async toggleTicketQrReveal(ticketId: string): Promise<void> {
@@ -365,7 +568,7 @@ export class WalletStateService {
     if (!target || target.status !== 'active') return;
 
     if (!target.qrRevealed) {
-      await this.triggerBiometricPulse('Desbloqueando QR', 850);
+      await this.triggerBiometricPulse('Desbloqueando QR Oficial', 750);
     }
 
     this.tickets.update((list) =>

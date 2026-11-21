@@ -1009,9 +1009,9 @@ export class CatalogPage {
   readonly market = inject(MarketStateService);
   private readonly router = inject(Router);
 
-  readonly searchQuery = signal<string>('');
-  readonly selectedCategory = signal<ProductCategory>('all');
-  readonly onlyAffordable = signal<boolean>(false);
+  readonly searchQuery = this.market.searchQuery;
+  readonly selectedCategory = this.market.selectedCategory;
+  readonly onlyAffordable = this.market.onlyAffordable;
   readonly selectedProduct = signal<Product | null>(null);
 
   readonly categories: { id: ProductCategory; label: string; icon: string }[] = [

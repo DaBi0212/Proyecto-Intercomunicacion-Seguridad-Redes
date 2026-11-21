@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CentralBank.Models;
 
@@ -52,6 +53,11 @@ public class BankTicketRecord
     public string OwnerEmail { get; set; } = string.Empty;
     public string OwnerInitials { get; set; } = string.Empty;
 
+    // Usuarios con los que se compartió este ticket mediante escaneo de QR
+    public string SharedWithEmails { get; set; } = string.Empty;
+    public string? UsedByEmail { get; set; }
+    public string? UsedByName { get; set; }
+
     public TicketStatus Status { get; set; } = TicketStatus.Active;
 
     public string PurchaseDate { get; set; } = string.Empty;
@@ -70,19 +76,81 @@ public class BankTicketRecord
     public long IssuedEpoch { get; set; }
     public bool IsSerialRevealed { get; set; }
 
+    public List<string> GetSharedEmailsList() =>
+        string.IsNullOrWhiteSpace(SharedWithEmails)
+            ? new List<string>()
+            : SharedWithEmails
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(e => e.Trim().ToLowerInvariant())
+                .Where(e => e.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    public bool CanBeAccessedBy(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        var clean = email.Trim().ToLowerInvariant();
+        if (OwnerEmail.Equals(clean, StringComparison.OrdinalIgnoreCase)) return true;
+        return GetSharedEmailsList().Any(e => e.Equals(clean, StringComparison.OrdinalIgnoreCase));
+    }
+
     // Propiedades de presentación XAML
     public bool IsUsed => Status == TicketStatus.Used;
     public bool IsUnused => Status == TicketStatus.Active;
+    public bool IsShared => GetSharedEmailsList().Count > 0;
 
     public string AmountFormatted => $"${Amount:N0}.00";
     public string TierUpper => $"CERTIFICADO DIGITAL · {Tier.ToUpperInvariant()}";
-    public string StatusBadgeText => IsUsed ? "YA USADO · CANJEADO" : "SIN USAR · ACTIVO";
+    public string StatusBadgeText => IsUsed
+        ? "YA USADO · CANJEADO"
+        : (IsShared ? "SIN USAR · COMPARTIDO QR" : "SIN USAR · ACTIVO");
     public string DisplayedSerial => IsSerialRevealed ? Id : SerialMasked;
     public string PurchaseTimestampFull => $"{PurchaseDate} · {PurchaseTime}";
     public string UsageSummaryText => IsUsed
-        ? $"Usado el {UsedDate} a las {UsedTime} en {MerchantName ?? "MarketStore"} (#{OrderId})"
-        : "Disponible en bóveda WalletPay del usuario (Aún no utilizado)";
+        ? $"Usado el {UsedDate} a las {UsedTime} por {UsedByName ?? OwnerName} en {MerchantName ?? "MarketStore"} (#{OrderId})"
+        : (IsShared
+            ? $"Activo · Compartido por QR con: {string.Join(", ", GetSharedEmailsList())}"
+            : "Disponible en bóveda WalletPay del usuario (Aún no utilizado)");
     public double CardOpacity => IsUsed ? 0.82 : 1.0;
+}
+
+public class PendingTicketPurchaseRecord
+{
+    public string RequestId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string UserEmail { get; set; } = string.Empty;
+    public string UserInitials { get; set; } = "US";
+    public string UserAvatarHex { get; set; } = "#007AFF";
+
+    public int Amount { get; set; }
+    public string Tier { get; set; } = string.Empty;
+    public string ColorClass { get; set; } = string.Empty;
+    public string PaymentMethod { get; set; } = string.Empty;
+
+    public string CreatedDate { get; set; } = string.Empty;
+    public string CreatedTime { get; set; } = string.Empty;
+
+    // "pending" | "approved" | "rejected"
+    public string ApprovalStatus { get; set; } = "pending";
+    public string? MintedTicketId { get; set; }
+    public string BankAuthCode { get; set; } = "PENDIENTE";
+    public string StatusReport { get; set; } = "Esperando validación de tarjeta/pago por el Administrador del Banco Central.";
+    public long CreatedEpoch { get; set; }
+
+    public bool IsPending => ApprovalStatus == "pending";
+    public bool IsApproved => ApprovalStatus == "approved";
+    public bool IsRejected => ApprovalStatus == "rejected";
+
+    public string AmountFormatted => $"${Amount:N2} MXN";
+    public string TicketTitle => $"Ticket {Tier} de ${Amount:N0}.00 MXN";
+    public string TimestampFull => $"{CreatedDate} · {CreatedTime}";
+    public string StatusPillText => ApprovalStatus switch
+    {
+        "approved" => $"PAGO APROBADO · TICKET {MintedTicketId}",
+        "rejected" => "PAGO DE TARJETA RECHAZADO",
+        _ => "VALIDACIÓN DE TARJETA PENDIENTE"
+    };
 }
 
 public class BankTransactionRecord

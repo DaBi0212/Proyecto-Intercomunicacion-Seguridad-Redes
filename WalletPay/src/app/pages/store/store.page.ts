@@ -37,7 +37,7 @@ interface PaymentMethod {
   tint: string;
 }
 
-type SheetState = 'idle' | 'processing' | 'done';
+type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
 
 @Component({
   selector: 'app-store',
@@ -60,7 +60,6 @@ type SheetState = 'idle' | 'processing' | 'done';
     SfSymbolComponent
   ],
   template: `
-    <!-- Barra de navegación translúcida -->
     <ion-header [translucent]="true">
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -70,6 +69,9 @@ type SheetState = 'idle' | 'processing' | 'done';
         </ion-buttons>
         <ion-title>Comprar Tickets</ion-title>
         <ion-buttons slot="end">
+          <ion-button (click)="goToVault()" aria-label="Mis Tickets y Escáner QR">
+            <sf-symbol name="qrcode.viewfinder" [size]="21" />
+          </ion-button>
           <ion-button (click)="wallet.lockSession('Bloqueo manual')" aria-label="Bloquear">
             <sf-symbol name="lock.fill" [size]="20" />
           </ion-button>
@@ -99,6 +101,17 @@ type SheetState = 'idle' | 'processing' | 'done';
         </button>
       </section>
 
+      <!-- Aviso en vivo si hay solicitudes de compra de ticket pendientes de aprobación del Banco -->
+      @if (wallet.pendingTicketRequests().length > 0) {
+        <section class="pending-req-banner continuous">
+          <sf-symbol name="clock.fill" [size]="19" />
+          <div class="prb-copy">
+            <strong>{{ wallet.pendingTicketRequests().length }} compra(s) esperando aprobación del Banco</strong>
+            <span>El Administrador de CentralBank debe aceptar el pago de tu tarjeta para emitir el ticket.</span>
+          </div>
+        </section>
+      }
+
       <!-- Tarjeta resumen de saldo disponible en bóveda -->
       <section class="balance-card continuous">
         <div class="bal-main">
@@ -116,11 +129,11 @@ type SheetState = 'idle' | 'processing' | 'done';
       <header class="section-head">
         <div>
           <h2>Denominaciones oficiales</h2>
-          <p>Certificados de valor fijo emitidos por Banco Central</p>
+          <p>Certificados emitidos tras aprobación bancaria de tu tarjeta</p>
         </div>
       </header>
 
-      <!-- Tarjetas rediseñadas estilo Apple Card / App Store Gift Card -->
+      <!-- Tarjetas estilo Apple Card / App Store Gift Card -->
       <div class="cards-stack">
         @for (d of denominations; track d.amount) {
           <article
@@ -129,7 +142,6 @@ type SheetState = 'idle' | 'processing' | 'done';
             [attr.aria-label]="'Comprar ticket de ' + d.amount + ' pesos'"
             (click)="open(d)"
           >
-            <!-- Marca de agua geométrica de seguridad (Guilloché / Apple Emblem) -->
             <svg class="card-watermark" viewBox="0 0 200 200" fill="none" aria-hidden="true">
               <circle cx="150" cy="100" r="88" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 5" />
               <circle cx="150" cy="100" r="64" stroke="currentColor" stroke-width="1.2" />
@@ -137,11 +149,9 @@ type SheetState = 'idle' | 'processing' | 'done';
               <path d="M90 100h120M150 40v120" stroke="currentColor" stroke-width="0.8" />
             </svg>
 
-            <!-- Muescas laterales de boleto (Ticket Notches) -->
             <span class="notch notch-left" aria-hidden="true"></span>
             <span class="notch notch-right" aria-hidden="true"></span>
 
-            <!-- Fila superior: Banco Emisor + Chip EMV + Badge -->
             <div class="tc-top">
               <div class="tc-issuer">
                 <span class="tc-emblem">
@@ -158,7 +168,6 @@ type SheetState = 'idle' | 'processing' | 'done';
               </span>
             </div>
 
-            <!-- Fila central: Valor Nominal + Chip metálico -->
             <div class="tc-middle">
               <div class="tc-price-block">
                 <div class="tc-amount">
@@ -167,7 +176,6 @@ type SheetState = 'idle' | 'processing' | 'done';
                 <span class="tc-currency-tag">MXN · Valor Fijo</span>
               </div>
 
-              <!-- Chip metálico estilo Apple Card + Contactless -->
               <div class="tc-hardware" aria-hidden="true">
                 <div class="emv-chip" [class.gold-chip]="d.isTitanium">
                   <span></span><span></span><span></span><span></span>
@@ -175,10 +183,8 @@ type SheetState = 'idle' | 'processing' | 'done';
               </div>
             </div>
 
-            <!-- Línea divisoria perforada -->
             <div class="tc-perforation" aria-hidden="true"></div>
 
-            <!-- Fila inferior: Descripción, Serie y Botón Adquirir -->
             <div class="tc-bottom">
               <div class="tc-meta">
                 <span class="tc-desc">{{ d.desc }}</span>
@@ -196,24 +202,32 @@ type SheetState = 'idle' | 'processing' | 'done';
 
       <p class="footnote">
         <sf-symbol name="shield.checkered" [size]="16" />
-        <span>Cada ticket cuenta con un sello único del Banco Central y queda resguardado en tu dispositivo. La tienda verifica su validez antes de aceptar tu compra.</span>
+        <span>
+          Cada compra de ticket es validada y aprobada por el Administrador en CentralBank Desktop (simulando la autorización bancaria de tu tarjeta sin requerir datos reales).
+        </span>
       </p>
 
-      <!-- Bottom Sheet deslizable de confirmación de compra -->
+      <!-- Bottom Sheet deslizable de confirmación y aprobación bancaria -->
       <ion-modal
         class="sheet-auto"
         [isOpen]="sheetOpen()"
         [initialBreakpoint]="1"
         [breakpoints]="[0, 1]"
         [handle]="true"
-        [canDismiss]="state() !== 'processing'"
         (didDismiss)="onDismiss()"
       >
         <ng-template>
           <div class="sheet">
             @if (selected(); as d) {
               <div class="sheet-head">
-                <span class="sheet-title">{{ state() === 'done' ? 'Listo' : 'Confirmar compra' }}</span>
+                <span class="sheet-title">
+                  @switch (state()) {
+                    @case ('done') { ¡Pago Aprobado! }
+                    @case ('waiting_approval') { Validando Tarjeta en Banco }
+                    @case ('rejected') { Pago Rechazado }
+                    @default { Confirmar compra de ticket }
+                  }
+                </span>
                 <button class="sheet-close" aria-label="Cerrar" (click)="close()">
                   <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
                 </button>
@@ -238,8 +252,35 @@ type SheetState = 'idle' | 'processing' | 'done';
               @if (state() === 'done') {
                 <div class="done">
                   <sf-symbol class="done-icon" name="checkmark.circle.fill" [size]="56" />
-                  <strong>Ticket emitido</strong>
-                  <span>Se guardó en Mis Tickets.</span>
+                  <strong>Pago Aprobado por el Banco Central</strong>
+                  <span>El Administrador autorizó tu tarjeta y el ticket se guardó en Mis Tickets.</span>
+                </div>
+              } @else if (state() === 'waiting_approval') {
+                <div class="waiting-box continuous">
+                  <div class="wait-orb">
+                    <ion-spinner name="crescent" />
+                  </div>
+                  <strong>Esperando Aprobación del Administrador</strong>
+                  <p>{{ approvalProgressText() }}</p>
+                  <div class="wait-steps">
+                    <div class="ws-row ok">
+                      <sf-symbol name="checkmark.circle.fill" [size]="16" />
+                      <span>Solicitud {{ currentRequestId() ? '#' + currentRequestId() : '' }} enviada por canal seguro</span>
+                    </div>
+                    <div class="ws-row active">
+                      <sf-symbol name="building.columns" [size]="16" />
+                      <span>El Administrador en CentralBank acepta o rechaza el cargo a tarjeta</span>
+                    </div>
+                  </div>
+                </div>
+              } @else if (state() === 'rejected') {
+                <div class="rejected-box continuous">
+                  <sf-symbol class="rej-icon" name="exclamationmark.triangle.fill" [size]="48" />
+                  <strong>Pago Rechazado por el Banco Central</strong>
+                  <p>{{ rejectionReason() }}</p>
+                  <button class="pay-btn continuous apple-pressable" (click)="state.set('idle')">
+                    Intentar con otro método de pago
+                  </button>
                 </div>
               } @else {
                 <ion-list [inset]="true">
@@ -265,11 +306,11 @@ type SheetState = 'idle' | 'processing' | 'done';
                     <ion-note slot="end">{{ d.amount | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
                   </ion-item>
                   <ion-item>
-                    <ion-label>Comisión bancaria</ion-label>
-                    <ion-note slot="end">Gratis</ion-note>
+                    <ion-label>Validación Bancaria</ion-label>
+                    <ion-note slot="end">Administrador CentralBank</ion-note>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-label><strong>Total</strong></ion-label>
+                    <ion-label><strong>Total a autorizar</strong></ion-label>
                     <ion-note slot="end" class="total">{{ d.amount | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
                   </ion-item>
                 </ion-list>
@@ -277,18 +318,14 @@ type SheetState = 'idle' | 'processing' | 'done';
                 <div class="pay-wrap">
                   <button
                     class="pay-btn continuous apple-pressable"
-                    [disabled]="state() === 'processing'"
                     (click)="confirm()"
                   >
-                    @if (state() === 'processing') {
-                      <ion-spinner name="crescent" />
-                      <span>Procesando…</span>
-                    } @else {
-                      <sf-symbol name="faceid" [size]="22" [weight]="2" />
-                      <span>{{ payLabel() }}</span>
-                    }
+                    <sf-symbol name="faceid" [size]="22" [weight]="2" />
+                    <span>{{ payLabel() }}</span>
                   </button>
-                  <p class="sheet-foot">Al confirmar, Banco Central emite un ticket único a tu nombre.</p>
+                  <p class="sheet-foot">
+                    El Administrador del Banco Central validará y aprobará el pago de tu tarjeta antes de emitir el ticket.
+                  </p>
                 </div>
               }
             }
@@ -298,7 +335,6 @@ type SheetState = 'idle' | 'processing' | 'done';
     </ion-content>
   `,
   styles: [`
-    /* Tarjeta de persona activa */
     .user-strip {
       --r: 16px;
       margin: 2px 20px 10px;
@@ -363,7 +399,32 @@ type SheetState = 'idle' | 'processing' | 'done';
       flex-shrink: 0;
     }
 
-    /* Tarjeta superior de saldo */
+    .pending-req-banner {
+      --r: 16px;
+      margin: 0 20px 12px;
+      padding: 12px 14px;
+      background: rgba(255, 149, 0, 0.16);
+      border: 1px solid rgba(255, 149, 0, 0.4);
+      color: #EA580C;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .prb-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .prb-copy strong {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ios-label);
+    }
+    .prb-copy span {
+      font-size: 11.5px;
+      color: var(--ios-label-2);
+    }
+
     .balance-card {
       --r: 20px;
       margin: 4px 20px 22px;
@@ -429,7 +490,6 @@ type SheetState = 'idle' | 'processing' | 'done';
       color: var(--ios-label-2);
     }
 
-    /* Stack de tarjetas premium */
     .cards-stack {
       display: flex;
       flex-direction: column;
@@ -451,8 +511,6 @@ type SheetState = 'idle' | 'processing' | 'done';
         inset 0 1px 0 rgba(255, 255, 255, 0.32),
         inset 0 -1px 0 rgba(0, 0, 0, 0.25);
     }
-
-    /* Brillo especular superior */
     .ticket-card::before {
       content: '';
       position: absolute;
@@ -461,7 +519,6 @@ type SheetState = 'idle' | 'processing' | 'done';
       pointer-events: none;
     }
 
-    /* Marca de agua de seguridad tipo certificado bancario */
     .card-watermark {
       position: absolute;
       right: -28px;
@@ -472,7 +529,6 @@ type SheetState = 'idle' | 'processing' | 'done';
       pointer-events: none;
     }
 
-    /* Muescas circulares laterales de ticket */
     .notch {
       position: absolute;
       bottom: 58px;
@@ -494,7 +550,6 @@ type SheetState = 'idle' | 'processing' | 'done';
       z-index: 2;
     }
 
-    /* Fila superior */
     .tc-top {
       display: flex;
       align-items: center;
@@ -552,7 +607,6 @@ type SheetState = 'idle' | 'processing' | 'done';
       box-shadow: inset 0 0 0 0.5px rgba(255, 214, 10, 0.45);
     }
 
-    /* Fila central: Precio y Chip metálico */
     .tc-middle {
       display: flex;
       align-items: flex-end;
@@ -592,7 +646,6 @@ type SheetState = 'idle' | 'processing' | 'done';
       opacity: 0.88;
     }
 
-    /* Chip EMV estilo Apple Card */
     .emv-chip {
       width: 34px;
       height: 25px;
@@ -616,13 +669,11 @@ type SheetState = 'idle' | 'processing' | 'done';
       background: linear-gradient(135deg, #FFE57F 0%, #D4AF37 55%, #AA7C11 100%);
     }
 
-    /* Perforación del ticket */
     .tc-perforation {
       border-top: 1px dashed rgba(255, 255, 255, 0.26);
       margin: 2px -4px 10px;
     }
 
-    /* Fila inferior */
     .tc-bottom {
       display: flex;
       align-items: center;
@@ -751,17 +802,17 @@ type SheetState = 'idle' | 'processing' | 'done';
       box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
     }
     ion-label h3 {
-      font-size: 17px !important;
-      font-weight: 400 !important;
+      font-size: 16px !important;
+      font-weight: 500 !important;
       color: var(--ios-label) !important;
     }
     ion-label p {
-      font-size: 13px !important;
+      font-size: 12.5px !important;
       color: var(--ios-label-2) !important;
     }
     .check { color: var(--ion-color-primary); }
     ion-note {
-      font-size: 17px;
+      font-size: 16px;
       color: var(--ios-label-2);
     }
     ion-note.total {
@@ -778,7 +829,7 @@ type SheetState = 'idle' | 'processing' | 'done';
       background: var(--ios-pay-bg);
       color: var(--ios-pay-fg);
       font-family: inherit;
-      font-size: 17px;
+      font-size: 16.5px;
       font-weight: 600;
       letter-spacing: -0.01em;
       display: flex;
@@ -786,16 +837,77 @@ type SheetState = 'idle' | 'processing' | 'done';
       justify-content: center;
       gap: 8px;
     }
-    .pay-btn ion-spinner {
-      width: 20px;
-      height: 20px;
-      color: var(--ios-pay-fg);
-    }
     .sheet-foot {
       margin: 10px 8px 0;
       text-align: center;
       font-size: 12px;
       color: var(--ios-label-2);
+    }
+
+    /* Waiting approval state */
+    .waiting-box,
+    .rejected-box {
+      --r: 18px;
+      margin: 10px 16px 16px;
+      padding: 20px 18px;
+      background: var(--ios-cell);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .wait-orb {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: rgba(0, 122, 255, 0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 4px;
+    }
+    .waiting-box strong,
+    .rejected-box strong {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ios-label);
+    }
+    .waiting-box p,
+    .rejected-box p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.4;
+      color: var(--ios-label-2);
+    }
+    .wait-steps {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--ios-sheet-cell);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+    .ws-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--ios-label-2);
+    }
+    .ws-row.ok {
+      color: var(--ion-color-success);
+      font-weight: 600;
+    }
+    .ws-row.active {
+      color: var(--ion-color-primary);
+      font-weight: 600;
+    }
+    .rej-icon {
+      color: var(--ion-color-danger);
     }
 
     .done {
@@ -834,7 +946,7 @@ export class StorePage {
     {
       amount: 50,
       tier: 'Estándar',
-      badge: 'Entrega inmediata',
+      badge: 'Validación bancaria',
       desc: 'Ideal para compras rápidas y envíos',
       code: 'SERIE A · 050',
       cls: 'card-tier-50'
@@ -867,29 +979,51 @@ export class StorePage {
   ];
 
   readonly methods: PaymentMethod[] = [
-    { id: 'Apple Pay', title: 'Tarjeta de Debito o Credito', sub: 'Visa •••• 4821', icon: 'creditcard', tint: '#000000' },
-    { id: 'Transferencia SPEI', title: 'Transferencia SPEI', sub: 'CLABE interbancaria', icon: 'building.columns', tint: '#007AFF' },
-    { id: 'OXXO Pay', title: 'Efectivo en OXXO', sub: 'Referencia válida por 48 h', icon: 'banknote', tint: '#FF3B30' }
+    {
+      id: 'Tarjeta Visa •••• 4821',
+      title: 'Tarjeta de Débito o Crédito',
+      sub: 'Visa •••• 4821 · Validación por Administrador Banco',
+      icon: 'creditcard',
+      tint: '#000000'
+    },
+    {
+      id: 'Tarjeta Mastercard •••• 8814',
+      title: 'Tarjeta Mastercard Oro',
+      sub: 'Mastercard •••• 8814 · Validación por Administrador Banco',
+      icon: 'creditcard.fill',
+      tint: '#EA580C'
+    },
+    {
+      id: 'Transferencia SPEI',
+      title: 'Transferencia SPEI',
+      sub: 'CLABE interbancaria · Validación Banco Central',
+      icon: 'building.columns',
+      tint: '#007AFF'
+    }
   ];
 
   readonly sheetOpen = signal(false);
   readonly selected = signal<Denomination | null>(null);
-  readonly payment = signal('Apple Pay');
+  readonly payment = signal('Tarjeta Visa •••• 4821');
   readonly state = signal<SheetState>('idle');
+  readonly approvalProgressText = signal('Enviando solicitud de pago al Banco Central...');
+  readonly currentRequestId = signal('');
+  readonly rejectionReason = signal('');
+  private cancelWaitingFlag = false;
 
-  readonly payLabel = computed(() =>
-    this.payment() === 'Apple Pay' ? 'Confirmar con Face ID' : 'Confirmar con Face ID'
-  );
+  readonly payLabel = computed(() => 'Solicitar Aprobación del Banco Central');
 
   open(d: Denomination): void {
     this.wallet.haptic('light');
     this.selected.set(d);
     this.state.set('idle');
+    this.cancelWaitingFlag = false;
     this.sheetOpen.set(true);
   }
 
   close(): void {
-    if (this.state() !== 'processing') this.sheetOpen.set(false);
+    this.cancelWaitingFlag = true;
+    this.sheetOpen.set(false);
   }
 
   selectMethod(id: string): void {
@@ -899,20 +1033,47 @@ export class StorePage {
 
   async confirm(): Promise<void> {
     const d = this.selected();
-    if (!d || this.state() === 'processing') return;
+    if (!d || this.state() === 'waiting_approval') return;
 
-    this.state.set('processing');
-    await this.wallet.purchaseAndMintTicket(d.amount, d.tier, d.cls, this.payment());
+    this.cancelWaitingFlag = false;
+    this.currentRequestId.set('');
+    this.state.set('waiting_approval');
+    this.approvalProgressText.set(
+      'Conectando con CentralBank Desktop (:5050) para validar tu tarjeta...'
+    );
+
+    const result = await this.wallet.requestAndWaitTicketPurchaseApproval(
+      d.amount,
+      this.payment(),
+      (progressMsg, reqId) => {
+        this.approvalProgressText.set(progressMsg);
+        if (reqId) this.currentRequestId.set(reqId);
+      },
+      () => this.cancelWaitingFlag
+    );
+
+    if (this.cancelWaitingFlag) return;
+
+    if (!result.ok) {
+      this.rejectionReason.set(
+        result.error || 'El Administrador del Banco Central rechazó el pago con tarjeta.'
+      );
+      this.state.set('rejected');
+      this.wallet.haptic('error');
+      return;
+    }
+
     this.state.set('done');
     this.wallet.haptic('success');
 
     setTimeout(() => {
       this.sheetOpen.set(false);
       this.router.navigateByUrl('/tabs/vault');
-    }, 1100);
+    }, 1200);
   }
 
   onDismiss(): void {
+    this.cancelWaitingFlag = true;
     this.sheetOpen.set(false);
     this.state.set('idle');
   }

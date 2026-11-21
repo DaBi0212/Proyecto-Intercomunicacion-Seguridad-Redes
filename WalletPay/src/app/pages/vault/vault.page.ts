@@ -1,5 +1,6 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, UpperCasePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
   IonHeader,
@@ -17,10 +18,12 @@ import {
   IonNote,
   IonSpinner
 } from '@ionic/angular/standalone';
+import jsQR from 'jsqr';
 import { WalletStateService } from '../../core/services/wallet-state.service';
 import { BankTicket } from '../../core/models/wallet.models';
 import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 import { AppleSpring, VelocityTracker, projectMomentum, rubberband } from '../../core/utils/apple-spring';
+import { generateQrSvgData } from '../../core/utils/qr-generator';
 
 type RedeemState = 'idle' | 'verifying' | 'done';
 
@@ -30,6 +33,7 @@ type RedeemState = 'idle' | 'verifying' | 'done';
   imports: [
     CurrencyPipe,
     UpperCasePipe,
+    FormsModule,
     IonHeader,
     IonToolbar,
     IonTitle,
@@ -47,7 +51,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
     SfSymbolComponent
   ],
   template: `
-    <!-- Barra de navegación superior translúcida -->
     <ion-header [translucent]="true">
       <ion-toolbar>
         <ion-buttons slot="start">
@@ -57,6 +60,9 @@ type RedeemState = 'idle' | 'verifying' | 'done';
         </ion-buttons>
         <ion-title>Mis Tickets</ion-title>
         <ion-buttons slot="end">
+          <ion-button (click)="openCameraScanner()" aria-label="Escanear QR de amigo">
+            <sf-symbol name="qrcode.viewfinder" [size]="22" />
+          </ion-button>
           <ion-button (click)="wallet.lockSession('Bloqueo manual')" aria-label="Bloquear">
             <sf-symbol name="lock.fill" [size]="20" />
           </ion-button>
@@ -65,12 +71,25 @@ type RedeemState = 'idle' | 'verifying' | 'done';
     </ion-header>
 
     <ion-content [fullscreen]="true">
-      <!-- Encabezado Large Title nativo de iOS que se reduce al hacer scroll -->
       <ion-header collapse="condense">
         <ion-toolbar>
           <ion-title size="large">Mis Tickets</ion-title>
         </ion-toolbar>
       </ion-header>
+
+      <!-- Barra de Acción Rápida: Escanear QR de Ticket de Amigo con Cámara Nativa -->
+      <div class="qr-share-bar">
+        <button type="button" class="scan-friend-btn continuous apple-pressable" (click)="openCameraScanner()">
+          <span class="sfb-icon">
+            <sf-symbol name="camera.viewfinder" [size]="20" [weight]="2.1" />
+          </span>
+          <div class="sfb-copy">
+            <strong>Escanear QR de Ticket de Amigo</strong>
+            <span>Usa la cámara nativa para recibir un ticket compartido</span>
+          </div>
+          <sf-symbol name="chevron.right" [size]="15" [weight]="2.4" />
+        </button>
+      </div>
 
       <!-- Segmented Control nativo de iOS (Disponibles vs Usados) -->
       <div class="segment-wrap">
@@ -93,18 +112,24 @@ type RedeemState = 'idle' | 'verifying' | 'done';
           <p>
             {{
               segment() === 'active'
-                ? 'Adquiere un ticket del Banco Central para pagar en la tienda virtual.'
-                : 'Los tickets que canjees en la tienda aparecerán aquí.'
+                ? 'Adquiere un ticket aprobado por el Banco Central o escanea el código QR del ticket de un amigo.'
+                : 'Los tickets que tú o tu amigo canjeen en la tienda aparecerán aquí.'
             }}
           </p>
           @if (segment() === 'active') {
-            <button class="btn-buy continuous apple-pressable" (click)="goToStore()">
-              Comprar Tickets
-            </button>
+            <div class="empty-ctas">
+              <button class="btn-buy continuous apple-pressable" (click)="goToStore()">
+                Comprar Tickets
+              </button>
+              <button class="btn-scan-empty continuous apple-pressable" (click)="openCameraScanner()">
+                <sf-symbol name="camera.fill" [size]="16" />
+                <span>Escanear QR de Amigo</span>
+              </button>
+            </div>
           }
         </div>
       } @else {
-        <!-- Carrusel tipo Apple Wallet con consistencia visual 1:1 respecto a Comprar Tickets -->
+        <!-- Carrusel tipo Apple Wallet con QR Real ISO/IEC 18004 -->
         <section
           class="carousel-stage"
           (pointerdown)="onPointerDown($event)"
@@ -123,7 +148,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                 [class.is-used]="t.status === 'used'"
                 [class.is-inactive]="i !== index()"
               >
-                <!-- Marca de agua geométrica de seguridad (idéntica a las tarjetas de tienda) -->
                 <svg class="pass-watermark" viewBox="0 0 200 200" fill="none" aria-hidden="true">
                   <circle cx="150" cy="85" r="88" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 5" />
                   <circle cx="150" cy="85" r="64" stroke="currentColor" stroke-width="1.2" />
@@ -131,11 +155,9 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                   <path d="M90 85h120M150 25v120" stroke="currentColor" stroke-width="0.8" />
                 </svg>
 
-                <!-- Muescas laterales de boleto alineadas con la perforación -->
                 <span class="notch notch-left" aria-hidden="true"></span>
                 <span class="notch notch-right" aria-hidden="true"></span>
 
-                <!-- Cabecera del pase: Emblema + CERTIFICADO DIGITAL + Estado -->
                 <header class="pass-head">
                   <div class="issuer">
                     <span class="issuer-badge">
@@ -143,7 +165,15 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                     </span>
                     <div class="issuer-text">
                       <strong>BANCO CENTRAL</strong>
-                      <span>CERTIFICADO DIGITAL · {{ t.tier | uppercase }}</span>
+                      <span>
+                        @if (t.isSharedWithMe) {
+                          COMPARTIDO POR {{ (t.ownerName || 'AMIGO') | uppercase }}
+                        } @else if (t.isShared) {
+                          COMPARTIDO VÍA QR · {{ t.tier | uppercase }}
+                        } @else {
+                          CERTIFICADO DIGITAL · {{ t.tier | uppercase }}
+                        }
+                      </span>
                     </div>
                   </div>
                   <span
@@ -151,11 +181,10 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                     [class.used]="t.status === 'used'"
                     [class.gold-pill]="t.amount === 500 && t.status === 'active'"
                   >
-                    {{ t.status === 'used' ? 'USADO' : 'ACTIVO' }}
+                    {{ t.status === 'used' ? 'USADO' : (t.isShared ? 'QR COMPARTIDO' : 'ACTIVO') }}
                   </span>
                 </header>
 
-                <!-- Bloque central: Valor nominal con .00 + Chip metálico EMV -->
                 <div class="pass-middle">
                   <div class="pass-price-block">
                     <span class="pass-label">VALOR NOMINAL FIJO</span>
@@ -170,55 +199,41 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                   </div>
                 </div>
 
-                <!-- Metadatos enmascarados + Firma RSA -->
                 <div class="pass-meta">
                   <div>
                     <span class="meta-k">FOLIO DE SEGURIDAD</span>
                     <span class="meta-v mono">{{ t.qrRevealed ? t.id : t.serialMasked }}</span>
                   </div>
                   <div>
-                    <span class="meta-k">{{ t.status === 'used' ? 'CANJEADO' : 'EMITIDO' }}</span>
-                    <span class="meta-v">{{ t.status === 'used' ? t.usedAt : t.issuedAt }}</span>
+                    <span class="meta-k">{{ t.status === 'used' ? 'USADO POR' : 'TITULAR' }}</span>
+                    <span class="meta-v">
+                      {{ t.status === 'used' ? (t.usedByName || t.ownerName || 'Titular') : (t.ownerName || 'Tú') }}
+                    </span>
                   </div>
                 </div>
 
-                <!-- Línea divisoria perforada de boleto -->
                 <div class="pass-perforation" aria-hidden="true"></div>
 
-                <!-- Talón inferior del ticket: Código QR difuminado por seguridad -->
+                <!-- Talón inferior del ticket: Código QR Real ISO/IEC 18004 -->
                 <button
                   type="button"
                   class="qr-well continuous apple-pressable"
                   (click)="toggleQr(t, $event)"
-                  [attr.aria-label]="t.qrRevealed ? 'Ocultar código QR' : 'Desbloquear código QR con Face ID'"
+                  [attr.aria-label]="t.qrRevealed ? 'Ver QR para compartir' : 'Desbloquear código QR con Face ID'"
                 >
                   <div class="qr-frame">
+                    @let qrSvg = getQrSvgForTicket(t);
                     <svg
                       class="qr-code"
                       [class.blurred]="!t.qrRevealed"
-                      viewBox="0 0 84 84"
+                      [attr.viewBox]="qrSvg.viewBox"
                       width="64"
                       height="64"
+                      shape-rendering="crispEdges"
                       aria-hidden="true"
                     >
-                      <rect x="6" y="6" width="20" height="20" rx="3" fill="#000"/>
-                      <rect x="10" y="10" width="12" height="12" rx="1.5" fill="#fff"/>
-                      <rect x="13" y="13" width="6" height="6" fill="#000"/>
-                      <rect x="58" y="6" width="20" height="20" rx="3" fill="#000"/>
-                      <rect x="62" y="10" width="12" height="12" rx="1.5" fill="#fff"/>
-                      <rect x="65" y="13" width="6" height="6" fill="#000"/>
-                      <rect x="6" y="58" width="20" height="20" rx="3" fill="#000"/>
-                      <rect x="10" y="62" width="12" height="12" rx="1.5" fill="#fff"/>
-                      <rect x="13" y="65" width="6" height="6" fill="#000"/>
-                      <rect x="32" y="10" width="8" height="8" rx="1.5" fill="#000"/>
-                      <rect x="44" y="16" width="8" height="8" rx="1.5" fill="#000"/>
-                      <rect x="30" y="30" width="14" height="14" rx="2" fill="#000"/>
-                      <rect x="48" y="34" width="10" height="10" rx="1.5" fill="#000"/>
-                      <rect x="14" y="36" width="10" height="10" rx="1.5" fill="#000"/>
-                      <rect x="62" y="38" width="12" height="12" rx="2" fill="#000"/>
-                      <rect x="34" y="52" width="12" height="12" rx="2" fill="#000"/>
-                      <rect x="52" y="56" width="10" height="10" rx="1.5" fill="#000"/>
-                      <rect x="66" y="64" width="12" height="12" rx="2" fill="#000"/>
+                      <rect width="100%" height="100%" fill="#fff" />
+                      <path [attr.d]="qrSvg.path" fill="#000" />
                     </svg>
                     @if (!t.qrRevealed) {
                       <span class="qr-lock">
@@ -230,15 +245,15 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                   <div class="qr-copy">
                     <div class="qr-title-row">
                       <strong class="mono">{{ t.qrRevealed ? t.id : t.serialMasked }}</strong>
-                      <span class="rsa-tag">OFICIAL</span>
+                      <span class="rsa-tag">{{ t.isShared ? 'COMPARTIDO' : 'QR OFICIAL' }}</span>
                     </div>
                     <span>
                       {{
                         t.status === 'used'
-                          ? 'Ticket redimido y verificado ante el Banco Central'
+                          ? 'Ticket ya utilizado · Bloqueo anti-doble gasto activo'
                           : t.qrRevealed
-                          ? 'Folio visible · Toca para bloquear'
-                          : 'Código protegido · Toca para ver con Face ID'
+                          ? 'QR activo · Tu amigo puede escanearlo con su cámara'
+                          : 'Código QR protegido · Toca para desbloquear y compartir'
                       }}
                     </span>
                   </div>
@@ -261,28 +276,211 @@ type RedeemState = 'idle' | 'verifying' | 'done';
           }
         </div>
 
-        <!-- Acción contextual para el ticket activo -->
+        <!-- Acciones contextuales para el ticket activo -->
         @if (current(); as sel) {
           <section class="pass-actions">
             @if (sel.status === 'active') {
               <button class="redeem-btn continuous apple-pressable" (click)="openRedeem(sel)">
                 <sf-symbol name="storefront" [size]="20" [weight]="2" />
-                <span>Usar en Tienda Virtual</span>
+                <span>Usar en Tienda Virtual (MarketStore)</span>
               </button>
+
+              <button class="share-qr-btn continuous apple-pressable" (click)="openShareQrModal(sel)">
+                <sf-symbol name="qrcode" [size]="19" [weight]="2" />
+                <span>Compartir Ticket con Amigo (Mostrar QR)</span>
+              </button>
+
               <p class="pass-caption">
-                Al pagar en la tienda, el banco verifica la validez de este ticket antes de autorizar la compra.
+                @if (sel.isSharedWithMe) {
+                  Ticket compartido por <strong>{{ sel.ownerName }}</strong>. Si tú o tu amigo lo usan primero en MarketStore, el otro ya no podrá utilizarlo.
+                } @else if (sel.isShared) {
+                  Compartido por QR. Recuerda: el primero en canjearlo en la tienda lo consumirá y quedará inhabilitado para el otro.
+                } @else {
+                  Puedes usar este ticket en MarketStore o mostrar su QR para que un amigo lo escanee con su cámara.
+                }
               </p>
             } @else {
               <div class="used-banner continuous">
                 <sf-symbol name="checkmark.seal.fill" [size]="20" />
-                <span>Validado y canjeado el {{ sel.usedAt }}</span>
+                <span>
+                  Ya usado por {{ sel.usedByName || sel.ownerName || 'Titular' }}
+                  {{ sel.orderId ? 'en #' + sel.orderId : '' }} ({{ sel.usedAt }}) · Inhabilitado para reuso
+                </span>
               </div>
             }
           </section>
         }
       }
 
-      <!-- Bottom Sheet deslizable para confirmar el canje del ticket en la tienda -->
+      <!-- MODAL 1: MOSTRAR QR EN GRANDE PARA QUE UN AMIGO LO ESCANEE CON SU CÁMARA -->
+      <ion-modal
+        class="sheet-auto"
+        [isOpen]="shareQrOpen()"
+        [initialBreakpoint]="1"
+        [breakpoints]="[0, 1]"
+        [handle]="true"
+        (didDismiss)="shareQrOpen.set(false)"
+      >
+        <ng-template>
+          <div class="sheet qr-share-sheet">
+            @if (current(); as sel) {
+              <div class="sheet-head">
+                <span class="sheet-title">Compartir Ticket con Amigo</span>
+                <button class="sheet-close" aria-label="Cerrar" (click)="shareQrOpen.set(false)">
+                  <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+                </button>
+              </div>
+
+              <div class="qr-hero-box continuous">
+                <div class="qhb-badge">
+                  <sf-symbol name="building.columns" [size]="14" />
+                  <span>BANCO CENTRAL · {{ sel.tier | uppercase }} · {{ '$' + sel.amount }}.00 MXN</span>
+                </div>
+
+                <div class="qr-large-frame">
+                  @let bigQr = getQrSvgForTicket(sel);
+                  <svg
+                    [attr.viewBox]="bigQr.viewBox"
+                    width="228"
+                    height="228"
+                    shape-rendering="crispEdges"
+                    aria-label="Código QR oficial del ticket"
+                  >
+                    <rect width="100%" height="100%" fill="#ffffff" />
+                    <path [attr.d]="bigQr.path" fill="#000000" />
+                  </svg>
+                </div>
+
+                <strong class="mono qhb-folio">{{ sel.id }}</strong>
+                <span class="qhb-owner">Comprado por: {{ sel.ownerName || wallet.currentUserName() }}</span>
+              </div>
+
+              <div class="security-notice continuous">
+                <sf-symbol name="shield.checkered" [size]="19" />
+                <div>
+                  <strong>Protección Anti-Doble Gasto Activa</strong>
+                  <span>
+                    Pídele a tu amigo que abra <strong>WalletPay</strong> en su celular y pulse
+                    <strong>"Escanear QR de Ticket de Amigo"</strong>. Si tú o tu amigo ya usaron este ticket, el Banco Central bloqueará su uso.
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </ion-modal>
+
+      <!-- MODAL 2: ESCÁNER DE CÁMARA NATIVA PARA RECIBIR TICKET QR DE UN AMIGO -->
+      <ion-modal
+        class="sheet-auto"
+        [isOpen]="scannerOpen()"
+        [initialBreakpoint]="1"
+        [breakpoints]="[0, 1]"
+        [handle]="true"
+        (didDismiss)="closeCameraScanner()"
+      >
+        <ng-template>
+          <div class="sheet scanner-sheet">
+            <div class="sheet-head">
+              <span class="sheet-title">Escanear QR de Ticket de Amigo</span>
+              <button class="sheet-close" aria-label="Cerrar" (click)="closeCameraScanner()">
+                <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+              </button>
+            </div>
+
+            <div class="camera-stage continuous">
+              <video
+                #cameraVideo
+                class="camera-video"
+                autoplay
+                playsinline
+                muted
+              ></video>
+              <canvas #cameraCanvas class="camera-canvas"></canvas>
+
+              <!-- Marco guía de escaneo láser -->
+              <div class="viewfinder-overlay">
+                <div class="vf-box">
+                  <span class="vf-corner tl"></span>
+                  <span class="vf-corner tr"></span>
+                  <span class="vf-corner bl"></span>
+                  <span class="vf-corner br"></span>
+                  <div class="vf-laser"></div>
+                </div>
+                <span class="vf-hint">
+                  {{
+                    cameraActive()
+                      ? 'Apunta la cámara al código QR del ticket de tu amigo'
+                      : 'Iniciando cámara nativa del dispositivo...'
+                  }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Botón alternativo para tomar foto con la app de Cámara Nativa de Android -->
+            <div class="native-cam-actions">
+              <label class="native-capture-btn continuous apple-pressable">
+                <sf-symbol name="camera.fill" [size]="18" />
+                <span>Capturar Foto con Cámara Nativa</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  hidden
+                  (change)="onNativeCameraPhotoCaptured($event)"
+                />
+              </label>
+            </div>
+
+            <!-- Resultado de validación de seguridad con el Banco Central -->
+            @if (scanFeedback()) {
+              <div
+                class="scan-result-banner continuous"
+                [class.ok]="scanSuccess()"
+                [class.err]="!scanSuccess()"
+              >
+                <sf-symbol
+                  [name]="scanSuccess() ? 'checkmark.seal.fill' : 'exclamationmark.triangle.fill'"
+                  [size]="22"
+                />
+                <div class="srb-copy">
+                  <strong>
+                    {{
+                      scanSuccess()
+                        ? '¡Ticket Verificado y Vinculado!'
+                        : 'Operación Bloqueada por Seguridad Bancaria'
+                    }}
+                  </strong>
+                  <span>{{ scanFeedback() }}</span>
+                </div>
+              </div>
+            }
+
+            <!-- Respaldo manual de folio en caso de prueba sin segundo teléfono -->
+            <div class="manual-qr-box continuous">
+              <span class="mqb-label">¿PROBAR CON FOLIO O CÓDIGO QR MANUALMENTE?</span>
+              <div class="mqb-row">
+                <input
+                  type="text"
+                  class="mqb-input mono"
+                  placeholder="Ej. TKT-8420-A1B2"
+                  [(ngModel)]="manualQrInput"
+                />
+                <button
+                  type="button"
+                  class="mqb-btn continuous apple-pressable"
+                  [disabled]="scanningBusy()"
+                  (click)="submitManualQr()"
+                >
+                  Validar
+                </button>
+              </div>
+            </div>
+          </div>
+        </ng-template>
+      </ion-modal>
+
+      <!-- MODAL 3: CONFIRMAR USO EN TIENDA VIRTUAL (MARKETSTORE EN VERCEL) -->
       <ion-modal
         class="sheet-auto"
         [isOpen]="redeemOpen()"
@@ -307,22 +505,24 @@ type RedeemState = 'idle' | 'verifying' | 'done';
               @if (redeemState() === 'done') {
                 <div class="redeem-done">
                   <sf-symbol class="done-icon" name="checkmark.circle.fill" [size]="56" />
-                  <strong>Abriendo MarketStore</strong>
+                  <strong>Abriendo MarketStore en Vercel</strong>
                   <span>Selecciona tus productos en la tienda; el Banco Central verificará y aprobará tu compra.</span>
                 </div>
               } @else {
                 <ion-list [inset]="true">
                   <ion-item>
-                    <ion-label>Comercio</ion-label>
-                    <ion-note slot="end">MarketStore (Tienda Web)</ion-note>
+                    <ion-label>Comercio Web</ion-label>
+                    <ion-note slot="end">MarketStore (Vercel)</ion-note>
                   </ion-item>
                   <ion-item>
                     <ion-label>Ticket seleccionado</ion-label>
                     <ion-note slot="end" class="mono">{{ sel.id }}</ion-note>
                   </ion-item>
                   <ion-item>
-                    <ion-label>Emisor</ion-label>
-                    <ion-note slot="end">Banco Central</ion-note>
+                    <ion-label>Origen</ion-label>
+                    <ion-note slot="end">
+                      {{ sel.isSharedWithMe ? 'Compartido por ' + sel.ownerName : 'Tu Bóveda WalletPay' }}
+                    </ion-note>
                   </ion-item>
                   <ion-item lines="none">
                     <ion-label><strong>Valor disponible</strong></ion-label>
@@ -355,11 +555,53 @@ type RedeemState = 'idle' | 'verifying' | 'done';
     </ion-content>
   `,
   styles: [`
-    .segment-wrap {
-      padding: 4px 20px 14px;
+    .qr-share-bar {
+      padding: 4px 20px 10px;
+    }
+    .scan-friend-btn {
+      --r: 16px;
+      width: 100%;
+      border: 0;
+      padding: 11px 14px;
+      background: var(--ios-cell);
+      color: var(--ios-label);
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      text-align: left;
+    }
+    .sfb-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: rgba(0, 122, 255, 0.14);
+      color: var(--ion-color-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .sfb-copy {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .sfb-copy strong {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .sfb-copy span {
+      font-size: 11.5px;
+      color: var(--ios-label-2);
     }
 
-    /* Carrusel tipo Apple Wallet */
+    .segment-wrap {
+      padding: 2px 20px 12px;
+    }
+
     .carousel-stage {
       overflow: hidden;
       padding: 6px 20px 14px;
@@ -393,8 +635,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
         inset 0 -1px 0 rgba(0, 0, 0, 0.25);
       transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 280ms ease, filter 280ms ease;
     }
-
-    /* Brillo especular diagonal idéntico a las tarjetas de Tienda */
     .pass::before {
       content: '';
       position: absolute;
@@ -403,7 +643,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       pointer-events: none;
     }
 
-    /* Marca de agua geométrica de seguridad (Guilloché) */
     .pass-watermark {
       position: absolute;
       right: -28px;
@@ -414,7 +653,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       pointer-events: none;
     }
 
-    /* Muescas circulares laterales de boleto alineadas con la perforación */
     .notch {
       position: absolute;
       bottom: 112px;
@@ -445,7 +683,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       z-index: 2;
     }
 
-    /* Cabecera consistente con StorePage */
     .pass-head {
       display: flex;
       align-items: center;
@@ -483,13 +720,13 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       font-size: 9.5px;
       font-weight: 600;
       letter-spacing: 0.04em;
-      opacity: 0.82;
+      opacity: 0.86;
     }
 
     .status-pill {
       padding: 4px 10px;
       border-radius: 999px;
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.04em;
       background: rgba(255, 255, 255, 0.22);
@@ -506,7 +743,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       background: rgba(0, 0, 0, 0.32);
     }
 
-    /* Bloque central: Monto + Chip EMV */
     .pass-middle {
       display: flex;
       align-items: flex-end;
@@ -550,7 +786,6 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       opacity: 0.9;
     }
 
-    /* Chip EMV estilo Apple Card */
     .emv-chip {
       width: 34px;
       height: 25px;
@@ -574,10 +809,9 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       background: linear-gradient(135deg, #FFE57F 0%, #D4AF37 55%, #AA7C11 100%);
     }
 
-    /* Metadatos enmascarados */
     .pass-meta {
       display: grid;
-      grid-template-columns: 1.3fr 0.7fr;
+      grid-template-columns: 1.25fr 0.75fr;
       gap: 10px;
       margin-bottom: 10px;
     }
@@ -590,20 +824,22 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       margin-bottom: 2px;
     }
     .meta-v {
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
     }
     .mono {
       font-family: var(--font-mono);
     }
 
-    /* Línea perforada del ticket */
     .pass-perforation {
       border-top: 1px dashed rgba(255, 255, 255, 0.28);
       margin: 2px -4px 10px;
     }
 
-    /* Talón inferior con QR difuminado por seguridad */
     .qr-well {
       --r: 16px;
       width: 100%;
@@ -672,17 +908,16 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       color: rgba(0, 0, 0, 0.65);
     }
     .qr-copy > span {
-      font-size: 11.5px;
-      line-height: 1.3;
-      color: rgba(60, 60, 67, 0.75);
+      font-size: 11px;
+      line-height: 1.28;
+      color: rgba(60, 60, 67, 0.78);
     }
 
-    /* Dots */
     .dots {
       display: flex;
       justify-content: center;
       gap: 7px;
-      padding: 4px 0 18px;
+      padding: 4px 0 16px;
     }
     .dot {
       width: 7px;
@@ -698,24 +933,38 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       background: var(--ios-label);
     }
 
-    /* Acciones bajo el carrusel */
     .pass-actions {
       padding: 0 20px 32px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
     }
     .redeem-btn {
       --r: 14px;
       width: 100%;
-      height: 52px;
+      height: 50px;
       border: 0;
       background: var(--ion-color-primary);
       color: #fff;
       font-family: inherit;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .share-qr-btn {
+      --r: 14px;
+      width: 100%;
+      height: 48px;
+      border: 0;
+      background: var(--ios-cell);
+      color: var(--ios-label);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -724,7 +973,8 @@ type RedeemState = 'idle' | 'verifying' | 'done';
     .pass-caption {
       margin: 0;
       text-align: center;
-      font-size: 13px;
+      font-size: 12.5px;
+      line-height: 1.38;
       color: var(--ios-label-2);
     }
     .used-banner {
@@ -732,16 +982,17 @@ type RedeemState = 'idle' | 'verifying' | 'done';
       padding: 14px 16px;
       background: var(--ios-cell);
       color: var(--ios-label-2);
-      font-size: 15px;
+      font-size: 13.5px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      text-align: center;
     }
 
-    /* Estado vacío */
+    /* Empty State */
     .empty-state {
-      padding: 56px 32px;
+      padding: 46px 28px;
       text-align: center;
       display: flex;
       flex-direction: column;
@@ -767,20 +1018,268 @@ type RedeemState = 'idle' | 'verifying' | 'done';
     }
     .empty-state p {
       margin: 0;
-      max-width: 260px;
-      font-size: 15px;
+      max-width: 280px;
+      font-size: 14.5px;
       line-height: 1.38;
       color: var(--ios-label-2);
     }
+    .empty-ctas {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
     .btn-buy {
       --r: 12px;
-      margin-top: 10px;
-      padding: 12px 20px;
+      padding: 12px 18px;
       border: 0;
       background: var(--ion-color-primary);
       color: #fff;
       font-family: inherit;
-      font-size: 15px;
+      font-size: 14.5px;
+      font-weight: 600;
+    }
+    .btn-scan-empty {
+      --r: 12px;
+      padding: 12px 16px;
+      border: 0;
+      background: var(--ios-cell);
+      color: var(--ios-label);
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Modal Compartir QR */
+    .qr-share-sheet {
+      padding-bottom: 24px;
+    }
+    .qr-hero-box {
+      --r: 22px;
+      margin: 8px 16px 14px;
+      padding: 18px;
+      background: var(--ios-cell);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .qhb-badge {
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(0, 122, 255, 0.14);
+      color: var(--ion-color-primary);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .qr-large-frame {
+      padding: 12px;
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qhb-folio {
+      font-size: 18px;
+      color: var(--ios-label);
+    }
+    .qhb-owner {
+      font-size: 12.5px;
+      color: var(--ios-label-2);
+    }
+    .security-notice {
+      --r: 16px;
+      margin: 0 16px;
+      padding: 12px 14px;
+      background: rgba(52, 199, 89, 0.14);
+      color: var(--ion-color-success);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .security-notice div {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .security-notice strong {
+      font-size: 13px;
+      color: var(--ios-label);
+    }
+    .security-notice span {
+      font-size: 12px;
+      line-height: 1.38;
+      color: var(--ios-label-2);
+    }
+
+    /* Modal Escáner Cámara Nativa */
+    .scanner-sheet {
+      padding-bottom: 24px;
+    }
+    .camera-stage {
+      --r: 20px;
+      position: relative;
+      margin: 8px 16px 12px;
+      height: 250px;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .camera-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .camera-canvas {
+      display: none;
+    }
+    .viewfinder-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: radial-gradient(circle, transparent 45%, rgba(0, 0, 0, 0.58) 100%);
+      pointer-events: none;
+    }
+    .vf-box {
+      position: relative;
+      width: 168px;
+      height: 168px;
+    }
+    .vf-corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: #30D158;
+      border-style: solid;
+      border-width: 0;
+    }
+    .vf-corner.tl { top: 0; left: 0; border-top-width: 3.5px; border-left-width: 3.5px; border-top-left-radius: 10px; }
+    .vf-corner.tr { top: 0; right: 0; border-top-width: 3.5px; border-right-width: 3.5px; border-top-right-radius: 10px; }
+    .vf-corner.bl { bottom: 0; left: 0; border-bottom-width: 3.5px; border-left-width: 3.5px; border-bottom-left-radius: 10px; }
+    .vf-corner.br { bottom: 0; right: 0; border-bottom-width: 3.5px; border-right-width: 3.5px; border-bottom-right-radius: 10px; }
+    .vf-laser {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      height: 2px;
+      background: #30D158;
+      box-shadow: 0 0 8px #30D158;
+      animation: laserScan 1.6s infinite alternate ease-in-out;
+    }
+    @keyframes laserScan {
+      from { top: 14px; }
+      to { top: 150px; }
+    }
+    .vf-hint {
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .native-cam-actions {
+      padding: 0 16px 10px;
+    }
+    .native-capture-btn {
+      --r: 14px;
+      width: 100%;
+      height: 44px;
+      background: rgba(0, 122, 255, 0.14);
+      color: var(--ion-color-primary);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .scan-result-banner {
+      --r: 16px;
+      margin: 0 16px 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .scan-result-banner.ok {
+      background: rgba(52, 199, 89, 0.16);
+      color: var(--ion-color-success);
+    }
+    .scan-result-banner.err {
+      background: rgba(255, 59, 48, 0.16);
+      color: var(--ion-color-danger);
+    }
+    .srb-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .srb-copy strong {
+      font-size: 13.5px;
+    }
+    .srb-copy span {
+      font-size: 12.5px;
+      line-height: 1.35;
+      color: var(--ios-label);
+    }
+
+    .manual-qr-box {
+      --r: 16px;
+      margin: 0 16px;
+      padding: 12px;
+      background: var(--ios-cell);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .mqb-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--ios-label-2);
+    }
+    .mqb-row {
+      display: flex;
+      gap: 8px;
+    }
+    .mqb-input {
+      flex: 1;
+      height: 38px;
+      border-radius: 10px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      padding: 0 12px;
+      font-size: 13.5px;
+      outline: none;
+    }
+    .mqb-btn {
+      --r: 10px;
+      border: 0;
+      padding: 0 14px;
+      background: var(--ion-color-primary);
+      color: #fff;
+      font-family: inherit;
+      font-size: 13.5px;
       font-weight: 600;
     }
 
@@ -839,9 +1338,12 @@ type RedeemState = 'idle' | 'verifying' | 'done';
     }
   `]
 })
-export class VaultPage {
+export class VaultPage implements OnDestroy {
   readonly wallet = inject(WalletStateService);
   private readonly router = inject(Router);
+
+  @ViewChild('cameraVideo') cameraVideoRef?: ElementRef<HTMLVideoElement>;
+  @ViewChild('cameraCanvas') cameraCanvasRef?: ElementRef<HTMLCanvasElement>;
 
   readonly segment = signal<'active' | 'used'>('active');
   readonly index = signal(0);
@@ -849,6 +1351,18 @@ export class VaultPage {
 
   readonly redeemOpen = signal(false);
   readonly redeemState = signal<RedeemState>('idle');
+
+  readonly shareQrOpen = signal(false);
+  readonly scannerOpen = signal(false);
+  readonly cameraActive = signal(false);
+  readonly scanningBusy = signal(false);
+  readonly scanFeedback = signal('');
+  readonly scanSuccess = signal(false);
+  manualQrInput = '';
+
+  private mediaStream: MediaStream | null = null;
+  private scanTimer: ReturnType<typeof setInterval> | null = null;
+  private qrSvgCache = new Map<string, { viewBox: string; path: string; size: number }>();
 
   readonly tickets = computed(() =>
     this.segment() === 'active' ? this.wallet.activeTickets() : this.wallet.usedTickets()
@@ -859,14 +1373,28 @@ export class VaultPage {
     return list[this.index()] ?? list[0] ?? null;
   });
 
-  // Física de resortes de Apple (§2 1:1 tracking, §3 interrumpible, §5 velocity handoff, §6 momentum)
   private readonly spring = new AppleSpring(0, { damping: 0.84, response: 0.36 });
   private readonly tracker = new VelocityTracker();
   private dragging = false;
   private startX = 0;
   private grabStart = 0;
   private moved = 0;
-  private readonly STRIDE = 320; // 306px tarjeta + 14px gap
+  private readonly STRIDE = 320;
+
+  ngOnDestroy(): void {
+    this.stopCameraStream();
+  }
+
+  getQrSvgForTicket(t: BankTicket): { viewBox: string; path: string; size: number } {
+    const payload =
+      t.qrPayload ||
+      `WPTKT1|${t.id}|${t.amount}|${t.ownerEmail || ''}|${t.issuedEpoch || 0}|${t.signatureHash}`;
+    const cached = this.qrSvgCache.get(payload);
+    if (cached) return cached;
+    const generated = generateQrSvgData(payload);
+    this.qrSvgCache.set(payload, generated);
+    return generated;
+  }
 
   onSegmentChange(ev: CustomEvent): void {
     const next = ev.detail.value as 'active' | 'used';
@@ -935,11 +1463,179 @@ export class VaultPage {
     });
   }
 
-  toggleQr(ticket: BankTicket, ev: Event): void {
+  async toggleQr(ticket: BankTicket, ev: Event): Promise<void> {
     ev.stopPropagation();
     if (this.moved > 8) return;
     this.wallet.haptic('light');
-    this.wallet.toggleTicketQrReveal(ticket.id);
+    await this.wallet.toggleTicketQrReveal(ticket.id);
+  }
+
+  async openShareQrModal(ticket: BankTicket): Promise<void> {
+    if (ticket.status !== 'active') return;
+    this.wallet.haptic('light');
+    if (!ticket.qrRevealed) {
+      await this.wallet.toggleTicketQrReveal(ticket.id);
+    }
+    this.shareQrOpen.set(true);
+  }
+
+  async openCameraScanner(): Promise<void> {
+    this.wallet.haptic('light');
+    this.scanFeedback.set('');
+    this.scanSuccess.set(false);
+    this.manualQrInput = '';
+    this.scannerOpen.set(true);
+    setTimeout(() => this.startCameraStream(), 220);
+  }
+
+  closeCameraScanner(): void {
+    this.stopCameraStream();
+    this.scannerOpen.set(false);
+  }
+
+  private async startCameraStream(): Promise<void> {
+    this.stopCameraStream();
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        this.scanFeedback.set('Usa el botón "Capturar Foto con Cámara Nativa" para escanear el código QR.');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+
+      this.mediaStream = stream;
+      const videoEl = this.cameraVideoRef?.nativeElement;
+      if (videoEl) {
+        videoEl.srcObject = stream;
+        await videoEl.play().catch(() => {});
+        this.cameraActive.set(true);
+      }
+
+      // Escaneo continuo de cuadros de video (BarcodeDetector nativo + jsQR)
+      const NativeBarcodeDetector = (window as any).BarcodeDetector;
+      const detector = NativeBarcodeDetector
+        ? new NativeBarcodeDetector({ formats: ['qr_code'] })
+        : null;
+
+      this.scanTimer = setInterval(async () => {
+        if (this.scanningBusy() || !this.cameraVideoRef?.nativeElement) return;
+        const video = this.cameraVideoRef.nativeElement;
+        if (video.readyState < 2 || video.videoWidth === 0) return;
+
+        try {
+          if (detector) {
+            const barcodes = await detector.detect(video);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+              await this.handleDecodedQrPayload(barcodes[0].rawValue);
+              return;
+            }
+          }
+
+          const canvas = this.cameraCanvasRef?.nativeElement;
+          if (!canvas) return;
+          const w = 420;
+          const h = Math.round((video.videoHeight / video.videoWidth) * w) || 320;
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx) return;
+          ctx.drawImage(video, 0, 0, w, h);
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const code = jsQR(imgData.data, imgData.width, imgData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+          if (code && code.data) {
+            await this.handleDecodedQrPayload(code.data);
+          }
+        } catch {
+          // Continuar siguiente cuadro
+        }
+      }, 180);
+    } catch {
+      this.cameraActive.set(false);
+    }
+  }
+
+  private stopCameraStream(): void {
+    if (this.scanTimer) {
+      clearInterval(this.scanTimer);
+      this.scanTimer = null;
+    }
+    if (this.mediaStream) {
+      for (const track of this.mediaStream.getTracks()) {
+        track.stop();
+      }
+      this.mediaStream = null;
+    }
+    this.cameraActive.set(false);
+  }
+
+  async onNativeCameraPhotoCaptured(ev: Event): Promise<void> {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = async () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const maxDim = 900;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imgData.data, imgData.width, imgData.height);
+        if (code && code.data) {
+          await this.handleDecodedQrPayload(code.data);
+        } else {
+          this.scanSuccess.set(false);
+          this.scanFeedback.set('No se detectó un código QR claro en la fotografía. Acerca más la cámara al QR del ticket.');
+          this.wallet.haptic('error');
+        }
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+        input.value = '';
+      }
+    };
+    img.src = objectUrl;
+  }
+
+  async submitManualQr(): Promise<void> {
+    if (!this.manualQrInput.trim()) return;
+    await this.handleDecodedQrPayload(this.manualQrInput.trim());
+  }
+
+  private async handleDecodedQrPayload(rawText: string): Promise<void> {
+    if (this.scanningBusy()) return;
+    this.scanningBusy.set(true);
+
+    const res = await this.wallet.scanAndClaimSharedTicket(rawText);
+    this.scanSuccess.set(res.ok);
+    this.scanFeedback.set(res.message);
+
+    if (res.ok) {
+      this.stopCameraStream();
+      this.segment.set('active');
+      this.snapTo(0, 0);
+      setTimeout(() => {
+        this.closeCameraScanner();
+      }, 1500);
+    }
+
+    setTimeout(() => {
+      this.scanningBusy.set(false);
+    }, 1400);
   }
 
   openRedeem(ticket: BankTicket): void {

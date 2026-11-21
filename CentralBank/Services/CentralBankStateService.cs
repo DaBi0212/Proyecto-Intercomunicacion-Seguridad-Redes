@@ -37,11 +37,13 @@ public class CentralBankStateService
     public List<BankUser> Users { get; private set; } = new();
     public List<BankTicketRecord> Tickets { get; private set; } = new();
     public List<BankTransactionRecord> Transactions { get; private set; } = new();
+    public List<PendingTicketPurchaseRecord> TicketRequests { get; private set; } = new();
     public List<PendingOrderApprovalRecord> Orders { get; private set; } = new();
     public List<AuditLogEntry> AuditLogs { get; private set; } = new();
 
     public event Action<string>? StateChanged;
     public event Action<PendingOrderApprovalRecord>? PendingOrderCreated;
+    public event Action<PendingTicketPurchaseRecord>? PendingTicketRequestCreated;
 
     public string DatabaseFilePath => _dbFilePath;
 
@@ -202,11 +204,33 @@ public class CentralBankStateService
             TryAlterColumn(conn, "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'buyer';");
             TryAlterColumn(conn, "ALTER TABLE users ADD COLUMN store_name TEXT NOT NULL DEFAULT '';");
             TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN signature TEXT NOT NULL DEFAULT '';");
+            TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN shared_with_emails TEXT NOT NULL DEFAULT '';");
+            TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN used_by_email TEXT;");
+            TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN used_by_name TEXT;");
             TryAlterColumn(conn, "ALTER TABLE orders ADD COLUMN integrity_sig TEXT NOT NULL DEFAULT '';");
             TryAlterColumn(conn, "ALTER TABLE orders ADD COLUMN receipt_sig TEXT NOT NULL DEFAULT '';");
 
             using var extra = conn.CreateCommand();
             extra.CommandText = @"
+                CREATE TABLE IF NOT EXISTS ticket_requests (
+                    request_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    user_name TEXT NOT NULL,
+                    user_email TEXT NOT NULL,
+                    user_initials TEXT NOT NULL,
+                    user_avatar_hex TEXT NOT NULL,
+                    amount INTEGER NOT NULL,
+                    tier TEXT NOT NULL,
+                    color_class TEXT NOT NULL,
+                    payment_method TEXT NOT NULL,
+                    created_date TEXT NOT NULL,
+                    created_time TEXT NOT NULL,
+                    approval_status TEXT NOT NULL DEFAULT 'pending',
+                    minted_ticket_id TEXT,
+                    bank_auth_code TEXT NOT NULL DEFAULT 'PENDIENTE',
+                    status_report TEXT NOT NULL,
+                    created_epoch INTEGER NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS device_tokens (
                     token_hash TEXT PRIMARY KEY,
                     email TEXT NOT NULL,
@@ -322,6 +346,7 @@ public class CentralBankStateService
             cmd.CommandText = @"
                 DELETE FROM transactions;
                 DELETE FROM tickets;
+                DELETE FROM ticket_requests;
                 DELETE FROM orders;
                 DELETE FROM users;
                 DELETE FROM audit_logs;
@@ -376,7 +401,7 @@ public class CentralBankStateService
                            owner_user_id, owner_name, owner_email, owner_initials,
                            status, purchase_date, purchase_time, payment_method, purchase_tx_id,
                            used_date, used_time, order_id, merchant_name, bank_verification_code, signature_hash,
-                           signature, created_epoch
+                           signature, created_epoch, shared_with_emails, used_by_email, used_by_name
                     FROM tickets
                     ORDER BY created_epoch DESC;";
                 using var r = cmd.ExecuteReader();
@@ -405,7 +430,10 @@ public class CentralBankStateService
                         BankVerificationCode = r.IsDBNull(18) ? null : r.GetString(18),
                         SignatureHash = r.GetString(19),
                         Signature = r.IsDBNull(20) ? "" : r.GetString(20),
-                        IssuedEpoch = r.GetInt64(21)
+                        IssuedEpoch = r.GetInt64(21),
+                        SharedWithEmails = r.IsDBNull(22) ? "" : r.GetString(22),
+                        UsedByEmail = r.IsDBNull(23) ? null : r.GetString(23),
+                        UsedByName = r.IsDBNull(24) ? null : r.GetString(24)
                     });
                 }
             }
@@ -492,6 +520,42 @@ public class CentralBankStateService
                 }
             }
 
+            // 4b. Cargar Solicitudes de Compra de Tickets (Validación de Tarjeta / Pago en WalletPay)
+            var ticketRequests = new List<PendingTicketPurchaseRecord>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT request_id, user_id, user_name, user_email, user_initials, user_avatar_hex,
+                           amount, tier, color_class, payment_method, created_date, created_time,
+                           approval_status, minted_ticket_id, bank_auth_code, status_report, created_epoch
+                    FROM ticket_requests
+                    ORDER BY created_epoch DESC;";
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    ticketRequests.Add(new PendingTicketPurchaseRecord
+                    {
+                        RequestId = r.GetString(0),
+                        UserId = r.GetString(1),
+                        UserName = r.GetString(2),
+                        UserEmail = r.GetString(3),
+                        UserInitials = r.GetString(4),
+                        UserAvatarHex = r.GetString(5),
+                        Amount = r.GetInt32(6),
+                        Tier = r.GetString(7),
+                        ColorClass = r.GetString(8),
+                        PaymentMethod = r.GetString(9),
+                        CreatedDate = r.GetString(10),
+                        CreatedTime = r.GetString(11),
+                        ApprovalStatus = r.GetString(12),
+                        MintedTicketId = r.IsDBNull(13) ? null : r.GetString(13),
+                        BankAuthCode = r.GetString(14),
+                        StatusReport = r.GetString(15),
+                        CreatedEpoch = r.GetInt64(16)
+                    });
+                }
+            }
+
             // 5. Cargar Bitácora HSM
             var logs = new List<AuditLogEntry>();
             using (var cmd = conn.CreateCommand())
@@ -513,6 +577,7 @@ public class CentralBankStateService
             Users = users;
             Tickets = tickets;
             Transactions = txs;
+            TicketRequests = ticketRequests;
             Orders = orders;
             AuditLogs = logs;
 
@@ -532,6 +597,8 @@ public class CentralBankStateService
     public int UnusedTicketsCount => Tickets.Count(t => t.Status == TicketStatus.Active);
     public int UsedTicketsCount => Tickets.Count(t => t.Status == TicketStatus.Used);
     public int PendingOrdersCount => Orders.Count(o => o.ApprovalStatus == "pending");
+    public int PendingTicketRequestsCount => TicketRequests.Count(r => r.ApprovalStatus == "pending");
+    public int TotalPendingApprovalsCount => PendingOrdersCount + PendingTicketRequestsCount;
 
     public double RedemptionRatePercent => TotalTicketsSoldCount == 0
         ? 0
@@ -1002,6 +1069,280 @@ public class CentralBankStateService
     }
 
     // =========================================================================
+    // VALIDACIÓN DE TARJETA / PAGO PARA COMPRA DE TICKETS (APROBACIÓN BANCARIA)
+    // =========================================================================
+
+    public PendingTicketPurchaseRecord CreatePendingTicketPurchaseRequest(string userEmail, int denomination, string paymentMethod)
+    {
+        if (!AllowedDenominations.Contains(denomination))
+        {
+            throw new InvalidOperationException("Denominación no permitida. Solo se emiten tickets de $50, $100, $200 o $500.");
+        }
+
+        ReloadFromDatabase();
+        var user = FindUser(userEmail) ?? throw new InvalidOperationException("Cuenta no encontrada.");
+        paymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "Tarjeta de Débito/Crédito Visa •••• 4821" : paymentMethod.Trim();
+        if (paymentMethod.Length > 80) paymentMethod = paymentMethod[..80];
+
+        var (tierName, colorClass) = denomination switch
+        {
+            50 => ("Estándar", "card-tier-50"),
+            100 => ("Plata", "card-tier-100"),
+            200 => ("Oro", "card-tier-200"),
+            _ => ("Titanium", "card-tier-500")
+        };
+
+        string requestId;
+        do
+        {
+            requestId = $"REQ-{SecurityService.NewInt(100000, 1000000)}";
+        } while (TicketRequests.Any(r => r.RequestId == requestId));
+
+        var now = DateTime.Now;
+        var dateStr = now.ToString("dd MMM yyyy");
+        var timeStr = now.ToString("HH:mm:ss 'hrs'");
+        var epoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        lock (_dbLock)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO ticket_requests (
+                    request_id, user_id, user_name, user_email, user_initials, user_avatar_hex,
+                    amount, tier, color_class, payment_method, created_date, created_time,
+                    approval_status, minted_ticket_id, bank_auth_code, status_report, created_epoch
+                ) VALUES (
+                    $rid, $uid, $uname, $uemail, $uinit, $uhex,
+                    $amt, $tier, $cls, $method, $cdate, $ctime,
+                    'pending', NULL, 'PENDIENTE',
+                    'Solicitud de compra de ticket recibida. Esperando que el Administrador del Banco valide y apruebe el pago con tarjeta.',
+                    $epoch
+                );";
+            cmd.Parameters.AddWithValue("$rid", requestId);
+            cmd.Parameters.AddWithValue("$uid", user.Id);
+            cmd.Parameters.AddWithValue("$uname", user.Name);
+            cmd.Parameters.AddWithValue("$uemail", user.Email);
+            cmd.Parameters.AddWithValue("$uinit", user.AvatarInitials);
+            cmd.Parameters.AddWithValue("$uhex", user.AvatarHex);
+            cmd.Parameters.AddWithValue("$amt", denomination);
+            cmd.Parameters.AddWithValue("$tier", tierName);
+            cmd.Parameters.AddWithValue("$cls", colorClass);
+            cmd.Parameters.AddWithValue("$method", paymentMethod);
+            cmd.Parameters.AddWithValue("$cdate", dateStr);
+            cmd.Parameters.AddWithValue("$ctime", timeStr);
+            cmd.Parameters.AddWithValue("$epoch", epoch);
+            cmd.ExecuteNonQuery();
+        }
+
+        AddAuditLog(
+            "CARD-REQ",
+            "#FF9500",
+            $"[Validación de Tarjeta] {user.Name} ({user.Email}) solicitó comprar Ticket {tierName} de ${denomination} MXN vía {paymentMethod} (#{requestId}). Esperando aprobación del Administrador."
+        );
+
+        ReloadFromDatabase();
+        var record = TicketRequests.First(r => r.RequestId == requestId);
+        PendingTicketRequestCreated?.Invoke(record);
+        NotifyStateChanged($"¡Nueva solicitud de compra de Ticket (${denomination} MXN) #{requestId} espera aprobación bancaria!");
+        return record;
+    }
+
+    public (bool Ok, string Message, BankTicketRecord? Ticket) ApproveTicketPurchaseRequest(string requestId)
+    {
+        lock (_approvalLock)
+        {
+            ReloadFromDatabase();
+            var req = TicketRequests.FirstOrDefault(r => r.RequestId.Equals(requestId, StringComparison.OrdinalIgnoreCase));
+            if (req == null) return (false, "Solicitud no encontrada.", null);
+            if (req.IsApproved)
+            {
+                var existingTk = Tickets.FirstOrDefault(t => t.Id == req.MintedTicketId);
+                return (true, "La solicitud ya había sido aprobada.", existingTk);
+            }
+            if (req.IsRejected) return (false, "La solicitud ya había sido rechazada.", null);
+
+            var minted = PurchaseTicketForUser(req.UserEmail, req.Amount, req.PaymentMethod);
+            var authCode = $"CARD-OK-{SecurityService.NewInt(10000, 100000)}";
+            var report = $"Pago con tarjeta ({req.PaymentMethod}) validado y aprobado por el Administrador ({authCode}). Ticket {minted.Id} emitido.";
+
+            lock (_dbLock)
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE ticket_requests
+                    SET approval_status = 'approved',
+                        minted_ticket_id = $tid,
+                        bank_auth_code = $code,
+                        status_report = $rep
+                    WHERE request_id = $rid;";
+                cmd.Parameters.AddWithValue("$tid", minted.Id);
+                cmd.Parameters.AddWithValue("$code", authCode);
+                cmd.Parameters.AddWithValue("$rep", report);
+                cmd.Parameters.AddWithValue("$rid", req.RequestId);
+                cmd.ExecuteNonQuery();
+            }
+
+            AddAuditLog(
+                "CARD-OK",
+                "#34C759",
+                $"[Pago de Tarjeta Aprobado] Solicitud #{req.RequestId} de {req.UserName} por ${req.Amount} MXN aprobada ({authCode}). Ticket {minted.Id} emitido a su bóveda."
+            );
+
+            ReloadFromDatabase();
+            NotifyStateChanged($"Pago de tarjeta aprobado (#{req.RequestId}) · Ticket {minted.Id} (${req.Amount} MXN) emitido");
+            return (true, authCode, minted);
+        }
+    }
+
+    public void RejectTicketPurchaseRequest(string requestId, string reason = "Pago con tarjeta rechazado por el Administrador del Banco Central.")
+    {
+        lock (_dbLock)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE ticket_requests
+                SET approval_status = 'rejected',
+                    bank_auth_code = 'CARD-DECLINED',
+                    status_report = $rep
+                WHERE request_id = $rid AND approval_status = 'pending';";
+            cmd.Parameters.AddWithValue("$rep", reason);
+            cmd.Parameters.AddWithValue("$rid", requestId);
+            cmd.ExecuteNonQuery();
+        }
+
+        AddAuditLog("CARD-REJ", "#FF3B30", $"[Pago de Tarjeta Rechazado] Solicitud #{requestId} denegada por el Administrador: {reason}");
+        ReloadFromDatabase();
+        NotifyStateChanged($"Solicitud de compra de ticket #{requestId} rechazada");
+    }
+
+    // =========================================================================
+    // COMPARTIR TICKET ENTRE AMIGOS MEDIANTE ESCANEO DE QR + ANTI-DOBLE GASTO
+    // =========================================================================
+
+    public (bool Ok, string Code, string Message, BankTicketRecord? Ticket) ShareTicketViaQrScan(string scannerEmail, string rawQrOrFolio)
+    {
+        ReloadFromDatabase();
+        var scanner = FindUser(scannerEmail);
+        if (scanner == null)
+            return (false, "UNAUTHORIZED", "Debes iniciar sesión para escanear un ticket.", null);
+
+        var raw = (rawQrOrFolio ?? "").Trim();
+        if (string.IsNullOrEmpty(raw))
+            return (false, "INVALID_QR", "El código QR escaneado está vacío.", null);
+
+        string folio = raw;
+        int? qrAmount = null;
+        string? qrSigHash = null;
+
+        // Formato QR oficial: WPTKT1|<id>|<amount>|<ownerEmail>|<issuedEpoch>|<signatureHash>
+        if (raw.StartsWith("WPTKT1|", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = raw.Split('|');
+            if (parts.Length < 6)
+                return (false, "INVALID_QR", "El formato del código QR del ticket es inválido o está incompleto.", null);
+
+            folio = parts[1].Trim().ToUpperInvariant();
+            if (int.TryParse(parts[2].Trim(), out var amt)) qrAmount = amt;
+            qrSigHash = parts[5].Trim();
+        }
+        else
+        {
+            folio = raw.ToUpperInvariant();
+        }
+
+        var tk = FindTicketByFolio(folio);
+        if (tk == null)
+        {
+            AddAuditLog("ALERT", "#FF3B30", $"[Escaneo QR] {scanner.Name} escaneó un folio inexistente ({folio}).");
+            return (false, "TICKET_NOT_FOUND", $"El ticket {folio} no existe ni fue emitido por el Banco Central.", null);
+        }
+
+        if (!IsTicketRecordAuthentic(tk) ||
+            (qrAmount.HasValue && qrAmount.Value != tk.Amount) ||
+            (!string.IsNullOrEmpty(qrSigHash) && !tk.SignatureHash.Equals(qrSigHash, StringComparison.OrdinalIgnoreCase)))
+        {
+            AddAuditLog("ALERT", "#FF3B30", $"[Escaneo QR] Alerta de integridad en el ticket {tk.Id} escaneado por {scanner.Name}.");
+            return (false, "TICKET_TAMPERED", $"El código QR del ticket {tk.Id} presenta alteraciones en su sello criptográfico y fue rechazado.", null);
+        }
+
+        // PROTECCIÓN ANTI-DOBLE GASTO: Si el propietario original o un amigo ya usó el ticket, nadie más puede usarlo.
+        if (tk.Status == TicketStatus.Used || tk.OrderId != null || HasRedemptionRecord(tk.Id))
+        {
+            var usedBy = tk.UsedByName ?? tk.OwnerName;
+            AddAuditLog(
+                "ALERT",
+                "#FF3B30",
+                $"[Anti-Doble Gasto · QR] {scanner.Name} intentó escanear/usar el ticket {tk.Id} de {tk.OwnerName}, pero YA FUE USADO por {usedBy} en #{tk.OrderId}. Bloqueado."
+            );
+            return (
+                false,
+                "TICKET_ALREADY_USED",
+                $"ALERTA DE SEGURIDAD ANTI-DOBLE GASTO: El ticket {tk.Id} (${tk.Amount} MXN) de {tk.OwnerName} ya fue utilizado por {usedBy} en la orden #{tk.OrderId} y ya no puede volver a usarse.",
+                tk
+            );
+        }
+
+        // Comprobar si está comprometido en una orden pendiente de aprobación
+        var reservedInOrder = Orders
+            .Where(o => o.IsPending)
+            .FirstOrDefault(o => ParseTicketIds(o.TicketIdsCsv).Any(id => id.Equals(tk.Id, StringComparison.OrdinalIgnoreCase)));
+        if (reservedInOrder != null)
+        {
+            return (
+                false,
+                "TICKET_RESERVED",
+                $"El ticket {tk.Id} ya está siendo utilizado en la compra #{reservedInOrder.OrderId} pendiente de aprobación bancaria.",
+                tk
+            );
+        }
+
+        if (tk.OwnerEmail.Equals(scanner.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            return (false, "OWN_TICKET", $"El ticket {tk.Id} (${tk.Amount} MXN) ya fue comprado por tu cuenta y está en tu bóveda.", tk);
+        }
+
+        var sharedList = tk.GetSharedEmailsList();
+        if (!sharedList.Any(e => e.Equals(scanner.Email, StringComparison.OrdinalIgnoreCase)))
+        {
+            sharedList.Add(scanner.Email.ToLowerInvariant());
+            var updatedCsv = string.Join(",", sharedList);
+
+            lock (_dbLock)
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "UPDATE tickets SET shared_with_emails = $sh WHERE id = $id;";
+                cmd.Parameters.AddWithValue("$sh", updatedCsv);
+                cmd.Parameters.AddWithValue("$id", tk.Id);
+                cmd.ExecuteNonQuery();
+            }
+
+            AddAuditLog(
+                "SHARE-QR",
+                "#007AFF",
+                $"[Ticket Compartido por QR] {tk.OwnerName} ({tk.OwnerEmail}) compartió el Ticket {tk.Id} (${tk.Amount} MXN) con {scanner.Name} ({scanner.Email}). Protección anti-doble gasto activa."
+            );
+        }
+
+        ReloadFromDatabase();
+        var updatedTk = Tickets.First(t => t.Id == tk.Id);
+        NotifyStateChanged($"Ticket {tk.Id} (${tk.Amount} MXN) compartido vía QR con {scanner.Name}");
+        return (
+            true,
+            "TICKET_SHARED_OK",
+            $"¡Ticket {tk.Id} (${tk.Amount} MXN) de {tk.OwnerName} vinculado exitosamente por QR! Recuerda: si tu amigo o tú lo usan en una compra, el otro ya no podrá utilizarlo.",
+            updatedTk
+        );
+    }
+
+    // =========================================================================
     // PASO 4: SOLICITUD DE COMPRA DESDE MARKETSTORE -> VERIFICACIÓN Y APROBACIÓN EN CENTRALBANK
     // =========================================================================
 
@@ -1057,13 +1398,16 @@ public class CentralBankStateService
                 !IsTicketRecordAuthentic(tk))
                 return (false, $"Los datos del ticket {tid} no coinciden con el registro del Banco Central.", OrderRejection.Tampered, null);
 
-            // 3) Solo el titular puede gastarlo.
-            if (!tk.OwnerEmail.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
-                return (false, $"El ticket {tid} pertenece a otra persona y no puede usarse con esta cuenta.", OrderRejection.NotOwner, null);
+            // 3) Solo el titular o un amigo con quien se haya compartido por QR puede gastarlo.
+            if (!tk.CanBeAccessedBy(user.Email))
+                return (false, $"El ticket {tid} pertenece a otra persona ({tk.OwnerName}) y no ha sido compartido con tu cuenta.", OrderRejection.NotOwner, null);
 
-            // 4) Protección contra doble gasto.
+            // 4) Protección contra doble gasto (incluyendo tickets compartidos ya usados por el amigo).
             if (tk.Status == TicketStatus.Used || tk.OrderId != null || HasRedemptionRecord(tk.Id))
-                return (false, $"El ticket {tid} ya fue utilizado y no puede reutilizarse.", OrderRejection.Reused, null);
+            {
+                var whoUsed = tk.UsedByName ?? tk.OwnerName;
+                return (false, $"ALERTA ANTI-DOBLE GASTO: El ticket {tid} ya fue utilizado por {whoUsed} en la orden #{tk.OrderId ?? "anterior"} y ya no puede volver a usarse.", OrderRejection.Reused, null);
+            }
 
             var reservation = reserved.FirstOrDefault(r => r.TicketId.Equals(tk.Id, StringComparison.OrdinalIgnoreCase));
             if (reservation.TicketId != null)
@@ -1193,10 +1537,10 @@ public class CentralBankStateService
                 return (false, Fail($"ALERTA: El folio {tid} NO fue emitido por el Banco Central (falsificación).", $"Folio {tid} apócrifo."));
             if (!IsTicketRecordAuthentic(tk))
                 return (false, Fail($"ALERTA: El registro del ticket {tid} fue modificado (monto, titular o fecha no coinciden con la emisión).", $"Ticket {tid} alterado."));
-            if (!tk.OwnerEmail.Equals(buyer.Email, StringComparison.OrdinalIgnoreCase))
-                return (false, Fail($"ALERTA: El ticket {tid} no pertenece al comprador.", $"Ticket {tid} ajeno."));
+            if (!tk.CanBeAccessedBy(buyer.Email))
+                return (false, Fail($"ALERTA: El ticket {tid} no pertenece al comprador ni fue compartido con su cuenta.", $"Ticket {tid} ajeno."));
             if (tk.Status == TicketStatus.Used || tk.OrderId != null || HasRedemptionRecord(tk.Id))
-                return (false, Fail($"ALERTA DE DOBLE GASTO: El ticket {tid} ya fue utilizado en #{tk.OrderId ?? "otra orden"}.", $"Ticket {tid} ya usado."));
+                return (false, Fail($"ALERTA DE DOBLE GASTO: El ticket {tid} ya fue utilizado por {tk.UsedByName ?? tk.OwnerName} en #{tk.OrderId ?? "otra orden"}.", $"Ticket {tid} ya usado."));
         }
 
         if (buyer.StoreCredit + 0.005m < order.StoreCreditUsed)
@@ -1289,12 +1633,16 @@ public class CentralBankStateService
                                 used_time = $utime,
                                 order_id = $oid,
                                 merchant_name = 'MarketStore',
-                                bank_verification_code = $code
+                                bank_verification_code = $code,
+                                used_by_email = $ubyemail,
+                                used_by_name = $ubyname
                             WHERE id = $tid AND status = 'active' AND order_id IS NULL;";
                         upTk.Parameters.AddWithValue("$udate", dateStr);
                         upTk.Parameters.AddWithValue("$utime", timeStr);
                         upTk.Parameters.AddWithValue("$oid", orderId);
                         upTk.Parameters.AddWithValue("$code", authCode);
+                        upTk.Parameters.AddWithValue("$ubyemail", order.BuyerEmail);
+                        upTk.Parameters.AddWithValue("$ubyname", order.BuyerName);
                         upTk.Parameters.AddWithValue("$tid", tk.Id);
                         if (upTk.ExecuteNonQuery() != 1)
                         {

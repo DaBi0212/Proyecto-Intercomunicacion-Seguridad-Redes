@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonContent, IonList, IonItem, IonInput } from '@ionic/angular/standalone';
+import { IonContent, IonList, IonItem, IonInput, IonModal } from '@ionic/angular/standalone';
 import { WalletStateService } from '../../core/services/wallet-state.service';
 import { WalletUserAccount } from '../../core/models/wallet.models';
 import { SfSymbolComponent } from '../../shared/sf-symbol.component';
@@ -8,12 +8,40 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [FormsModule, IonContent, IonList, IonItem, IonInput, SfSymbolComponent],
+  imports: [FormsModule, IonContent, IonList, IonItem, IonInput, IonModal, SfSymbolComponent],
   template: `
     <ion-content [fullscreen]="true">
       <main class="auth">
+        <!-- Barra superior de estado de conexión con CentralBank (:5050) y Vercel -->
+        <header class="net-bar">
+          <button
+            type="button"
+            class="net-pill continuous apple-pressable"
+            [class.ok]="wallet.bankConnected()"
+            (click)="openNetModal()"
+          >
+            <span class="net-dot"></span>
+            <span>
+              {{
+                wallet.bankConnected()
+                  ? 'Banco Central Conectado'
+                  : 'Configurar IP Banco (:5050)'
+              }}
+            </span>
+            <sf-symbol name="gearshape.fill" [size]="13" />
+          </button>
+
+          <button
+            type="button"
+            class="theme-pill continuous apple-pressable"
+            (click)="wallet.toggleTheme()"
+            aria-label="Cambiar apariencia"
+          >
+            <sf-symbol name="circle.lefthalf.filled" [size]="18" />
+          </button>
+        </header>
+
         <section class="brand">
-          <!-- Ícono de app: pila de pases tipo Wallet sobre squircle negro -->
           <div class="app-icon continuous" aria-hidden="true">
             <span class="pass p1"></span>
             <span class="pass p2"></span>
@@ -21,13 +49,12 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             <span class="pocket"></span>
           </div>
           <h1>WalletPay</h1>
-          <p>Bóveda multi-usuario de tickets del Banco Central sincronizada con MarketStore.</p>
+          <p>Bóveda móvil de tickets del Banco Central sincronizada con MarketStore en Vercel.</p>
         </section>
 
-        <!-- Selector de Cuentas Registradas en SQLite (Para que varias personas accedan fácilmente) -->
         @if (wallet.registeredUsers().length > 0 && !isRegistering()) {
           <section class="accounts-box">
-            <span class="sec-label">PERSONAS REGISTRADAS EN ESTE DISPOSITIVO / BANCO</span>
+            <span class="sec-label">PERSONAS REGISTRADAS EN BANCO CENTRAL</span>
             <div class="accounts-list">
               @for (u of wallet.registeredUsers(); track u.email) {
                 <button
@@ -53,7 +80,6 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
         }
 
         <section class="actions">
-          <!-- Segmented Control iOS: Iniciar Sesión vs. Registrar Nueva Persona -->
           <div class="mode-segmented continuous">
             <button
               type="button"
@@ -100,16 +126,16 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             </ion-item>
             @if (usePassword() || isRegistering()) {
               <ion-item lines="none">
-                  <ion-input
-                    label="Contraseña"
-                    labelPlacement="fixed"
-                    type="password"
-                    autocomplete="current-password"
-                    placeholder="Mínimo 6 caracteres"
-                    [(ngModel)]="password"
-                    (ionInput)="error.set('')"
-                    (keyup.enter)="submitAuth()"
-                  />
+                <ion-input
+                  label="Contraseña"
+                  labelPlacement="fixed"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="Mínimo 6 caracteres"
+                  [(ngModel)]="password"
+                  (ionInput)="error.set('')"
+                  (keyup.enter)="submitAuth()"
+                />
               </ion-item>
             }
           </ion-list>
@@ -154,9 +180,90 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
           }
 
           <p class="legal">
-            Cada persona tiene su propia bóveda de tickets vinculada con MarketStore y CentralBank.
+            Conectado a <strong>{{ wallet.activeBankUrl() }}</strong> · Tienda en <strong>Vercel</strong>
           </p>
         </section>
+
+        <!-- Modal de Configuración de IP del Servidor CentralBank y URL de MarketStore (Vercel) -->
+        <ion-modal
+          class="sheet-auto"
+          [isOpen]="netModalOpen()"
+          [initialBreakpoint]="1"
+          [breakpoints]="[0, 1]"
+          [handle]="true"
+          (didDismiss)="netModalOpen.set(false)"
+        >
+          <ng-template>
+            <div class="net-sheet">
+              <div class="sheet-head">
+                <span class="sheet-title">Conexión Red Real (APK + Banco + Vercel)</span>
+                <button class="sheet-close" aria-label="Cerrar" (click)="netModalOpen.set(false)">
+                  <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+                </button>
+              </div>
+
+              <p class="net-desc">
+                Ingresa la dirección IP Wi-Fi de la computadora donde se ejecuta <strong>CentralBank.exe</strong> (puerto 5050) y la URL desplegada en <strong>Vercel</strong> para MarketStore.
+              </p>
+
+              <div class="net-form">
+                <label class="net-field">
+                  <span>IP / URL del Banco Central (:5050)</span>
+                  <input
+                    type="text"
+                    placeholder="http://192.168.1.74:5050/api"
+                    [(ngModel)]="bankUrlInput"
+                  />
+                </label>
+
+                <div class="preset-chips">
+                  <button type="button" class="p-chip" (click)="bankUrlInput = 'http://192.168.1.74:5050/api'">
+                    Wi-Fi PC (192.168.1.74)
+                  </button>
+                  <button type="button" class="p-chip" (click)="bankUrlInput = 'http://localhost:5050/api'">
+                    Localhost
+                  </button>
+                </div>
+
+                <label class="net-field">
+                  <span>URL de MarketStore (Desplegada en Vercel)</span>
+                  <input
+                    type="text"
+                    placeholder="https://proyecto-intercomunicacion-seguridad-redes.vercel.app"
+                    [(ngModel)]="storeUrlInput"
+                  />
+                </label>
+
+                <div class="preset-chips">
+                  <button
+                    type="button"
+                    class="p-chip"
+                    (click)="storeUrlInput = 'https://proyecto-intercomunicacion-seguridad-redes.vercel.app'"
+                  >
+                    Vercel Producción
+                  </button>
+                  <button type="button" class="p-chip" (click)="storeUrlInput = 'http://192.168.1.74:4201'">
+                    Red Local (:4201)
+                  </button>
+                </div>
+
+                @if (netFeedback()) {
+                  <p class="net-msg" [class.ok]="wallet.bankConnected()">{{ netFeedback() }}</p>
+                }
+
+                <button
+                  type="button"
+                  class="btn-filled continuous apple-pressable"
+                  [disabled]="testingNet()"
+                  (click)="saveAndTestNet()"
+                >
+                  <sf-symbol name="wifi" [size]="18" />
+                  <span>{{ testingNet() ? 'Verificando conexión...' : 'Guardar y Probar Conexión' }}</span>
+                </button>
+              </div>
+            </div>
+          </ng-template>
+        </ion-modal>
       </main>
     </ion-content>
   `,
@@ -168,8 +275,51 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: calc(env(safe-area-inset-top, 0px) + 20px) 0 calc(env(safe-area-inset-bottom, 0px) + 20px);
-      gap: 14px;
+      padding: calc(env(safe-area-inset-top, 0px) + 12px) 0 calc(env(safe-area-inset-bottom, 0px) + 20px);
+      gap: 12px;
+    }
+
+    .net-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .net-pill {
+      --r: 999px;
+      border: 0;
+      padding: 6px 12px;
+      background: var(--ios-cell);
+      color: var(--ios-label-2);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .net-pill.ok {
+      color: var(--ion-color-success);
+    }
+    .net-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FF9500;
+    }
+    .net-pill.ok .net-dot {
+      background: #30D158;
+    }
+    .theme-pill {
+      --r: 11px;
+      width: 34px;
+      height: 34px;
+      border: 0;
+      background: var(--ios-cell);
+      color: var(--ios-label);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .brand {
@@ -177,15 +327,15 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       flex-direction: column;
       align-items: center;
       text-align: center;
-      padding: 12px 28px 4px;
+      padding: 4px 28px 4px;
     }
 
     .app-icon {
       --r: 22px;
       position: relative;
-      width: 84px;
-      height: 84px;
-      margin-bottom: 16px;
+      width: 80px;
+      height: 80px;
+      margin-bottom: 12px;
       overflow: hidden;
       background: linear-gradient(180deg, #2C2C2E 0%, #000 100%);
       box-shadow: var(--ios-shadow-card);
@@ -205,7 +355,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       left: 10px;
       right: 10px;
       bottom: 10px;
-      height: 32px;
+      height: 30px;
       border-radius: 8px;
       background: #3A3A3C;
       box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.5);
@@ -213,7 +363,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 
     h1 {
       margin: 0 0 6px;
-      font-size: 30px;
+      font-size: 29px;
       font-weight: 700;
       letter-spacing: -0.022em;
       color: var(--ios-label);
@@ -221,7 +371,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
     .brand p {
       margin: 0;
       max-width: 320px;
-      font-size: 14.5px;
+      font-size: 14px;
       line-height: 1.35;
       color: var(--ios-label-2);
     }
@@ -243,7 +393,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 170px;
+      max-height: 165px;
       overflow-y: auto;
     }
     .account-pill {
@@ -370,8 +520,68 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
     .legal {
       margin: 4px 0 0;
       text-align: center;
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--ios-label-2);
+    }
+
+    /* Sheet de red */
+    .net-sheet {
+      padding: 12px 18px 26px;
+    }
+    .net-desc {
+      margin: 6px 0 14px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--ios-label-2);
+    }
+    .net-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .net-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .net-field span {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--ios-label-2);
+    }
+    .net-field input {
+      height: 42px;
+      border-radius: 11px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-cell);
+      color: var(--ios-label);
+      padding: 0 12px;
+      font-size: 13.5px;
+      font-family: var(--font-mono);
+      outline: none;
+    }
+    .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .p-chip {
+      border: 0;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(0, 122, 255, 0.14);
+      color: var(--ion-color-primary);
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .net-msg {
+      margin: 2px 0;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ion-color-danger);
+    }
+    .net-msg.ok {
+      color: var(--ion-color-success);
     }
   `]
 })
@@ -383,12 +593,40 @@ export class AuthPage implements OnInit {
   readonly busy = signal(false);
   readonly error = signal('');
 
+  readonly netModalOpen = signal(false);
+  readonly testingNet = signal(false);
+  readonly netFeedback = signal('');
+  bankUrlInput = '';
+  storeUrlInput = '';
+
   fullName = '';
   email = '';
   password = '';
 
   ngOnInit(): void {
+    this.bankUrlInput = this.wallet.crypto.getCustomBankUrl();
+    this.storeUrlInput = this.wallet.crypto.getMarketStoreUrl();
     this.wallet.fetchRegisteredUsers();
+  }
+
+  openNetModal(): void {
+    this.bankUrlInput = this.wallet.crypto.getCustomBankUrl();
+    this.storeUrlInput = this.wallet.crypto.getMarketStoreUrl();
+    this.netFeedback.set('');
+    this.netModalOpen.set(true);
+  }
+
+  async saveAndTestNet(): Promise<void> {
+    this.testingNet.set(true);
+    const res = await this.wallet.saveNetworkSettings(this.bankUrlInput, this.storeUrlInput);
+    this.testingNet.set(false);
+    this.netFeedback.set(res.message);
+    if (res.ok) {
+      this.wallet.haptic('success');
+      setTimeout(() => this.netModalOpen.set(false), 750);
+    } else {
+      this.wallet.haptic('error');
+    }
   }
 
   showNameField(): boolean {

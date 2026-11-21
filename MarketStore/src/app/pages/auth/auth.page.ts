@@ -10,11 +10,30 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
   imports: [FormsModule, SfSymbolComponent],
   template: `
     <div class="auth-page">
-      <!-- Barra superior minimalista con control de tema -->
+      <!-- Barra superior minimalista con estado de conexión al Banco Central y control de tema -->
       <header class="auth-topbar">
-        <div class="topbar-badge continuous">
-          <sf-symbol name="shield.checkered" [size]="15" />
-          <span>Multi-Usuario · Verificación Bancaria en Vivo</span>
+        <div class="topbar-left">
+          <div class="topbar-badge continuous">
+            <sf-symbol name="shield.checkered" [size]="15" />
+            <span>Multi-Usuario · Verificación Bancaria en Vivo</span>
+          </div>
+
+          <button
+            type="button"
+            class="topbar-badge net-btn continuous apple-pressable"
+            [class.ok]="market.bankConnected()"
+            (click)="openNetConfig()"
+          >
+            <span class="net-dot"></span>
+            <span>
+              {{
+                market.bankConnected()
+                  ? 'Banco Central Conectado (' + market.activeBankUrl() + ')'
+                  : 'Configurar IP Banco Central (:5050)'
+              }}
+            </span>
+            <sf-symbol name="gearshape.fill" [size]="13" />
+          </button>
         </div>
 
         <button
@@ -26,6 +45,35 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
           <sf-symbol name="circle.lefthalf.filled" [size]="20" />
         </button>
       </header>
+
+      @if (netConfigOpen()) {
+        <div class="net-config-bar continuous">
+          <div class="ncb-copy">
+            <strong>Dirección IP del Servidor CentralBank.exe (:5050)</strong>
+            <span>Ingresa la IP Wi-Fi de la PC donde corre CentralBank (ej. http://192.168.1.74:5050/api o http://localhost:5050/api):</span>
+          </div>
+          <div class="ncb-controls">
+            <input
+              type="text"
+              class="ncb-input"
+              placeholder="http://192.168.1.74:5050/api"
+              [(ngModel)]="bankUrlInput"
+            />
+            <button type="button" class="ncb-preset" (click)="bankUrlInput = 'http://192.168.1.74:5050/api'">
+              192.168.1.74
+            </button>
+            <button type="button" class="ncb-preset" (click)="bankUrlInput = 'http://localhost:5050/api'">
+              localhost
+            </button>
+            <button type="button" class="ncb-save apple-pressable" (click)="saveNetConfig()">
+              Conectar
+            </button>
+          </div>
+          @if (netConfigMsg()) {
+            <span class="ncb-msg" [class.ok]="market.bankConnected()">{{ netConfigMsg() }}</span>
+          }
+        </div>
+      }
 
       <main class="auth-grid">
         <!-- Columna izquierda (en Desktop): Contexto del Ecosistema MarketStore + WalletPay -->
@@ -282,10 +330,19 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
     .auth-topbar {
       max-width: 1120px;
       width: 100%;
-      margin: 0 auto 20px;
+      margin: 0 auto 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .topbar-badge {
@@ -298,6 +355,96 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      border: 0;
+    }
+    .net-btn {
+      cursor: pointer;
+    }
+    .net-btn.ok {
+      color: var(--ion-color-success);
+    }
+    .net-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FF9500;
+    }
+    .net-btn.ok .net-dot {
+      background: #30D158;
+    }
+
+    .net-config-bar {
+      --r: 18px;
+      max-width: 1120px;
+      width: 100%;
+      margin: 0 auto 16px;
+      padding: 14px 18px;
+      background: var(--ios-card-elevated);
+      border: 0.5px solid var(--ios-separator);
+      box-shadow: var(--ios-shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ncb-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ncb-copy strong {
+      font-size: 13.5px;
+    }
+    .ncb-copy span {
+      font-size: 12px;
+      color: var(--ios-label-2);
+    }
+    .ncb-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ncb-input {
+      flex: 1;
+      min-width: 220px;
+      height: 38px;
+      border-radius: 10px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-cell);
+      color: var(--ios-label);
+      padding: 0 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+    }
+    .ncb-preset {
+      border: 0;
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 10px;
+      background: var(--ios-cell);
+      color: var(--ion-color-primary);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ncb-save {
+      border: 0;
+      height: 38px;
+      padding: 0 16px;
+      border-radius: 10px;
+      background: var(--ion-color-primary);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ncb-msg {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ion-color-danger);
+    }
+    .ncb-msg.ok {
+      color: var(--ion-color-success);
     }
 
     .theme-btn {
@@ -696,16 +843,38 @@ export class AuthPage implements OnInit {
   readonly isRegistering = signal(false);
   readonly busy = signal(false);
   readonly error = signal('');
+  readonly netConfigOpen = signal(false);
+  readonly netConfigMsg = signal('');
+  bankUrlInput = '';
 
   customName = '';
   email = '';
   password = '';
 
   async ngOnInit(): Promise<void> {
+    this.bankUrlInput = this.market.crypto.getCustomBankUrl();
     await this.market.fetchRegisteredUsers();
     const users = this.market.registeredUsers();
     if (users.length > 0) {
       this.selectRegisteredUser(users[0]);
+    }
+  }
+
+  openNetConfig(): void {
+    this.bankUrlInput = this.market.crypto.getCustomBankUrl();
+    this.netConfigMsg.set('');
+    this.netConfigOpen.update((v) => !v);
+  }
+
+  async saveNetConfig(): Promise<void> {
+    const res = await this.market.saveBankConnectionUrl(this.bankUrlInput);
+    this.netConfigMsg.set(res.message);
+    if (res.ok) {
+      const users = this.market.registeredUsers();
+      if (users.length > 0) {
+        this.selectRegisteredUser(users[0]);
+      }
+      setTimeout(() => this.netConfigOpen.set(false), 900);
     }
   }
 

@@ -25,13 +25,32 @@ export interface BankTicket {
   status: TicketStatus;
   issuedAt: string;
   usedAt?: string;
+  usedByName?: string;
+  usedByEmail?: string;
   orderId?: string;
   signatureHash: string;
   signature?: string;
   issuedEpoch?: number;
   ownerName?: string;
   ownerEmail?: string;
+  isShared?: boolean;
+  isSharedWithMe?: boolean;
+  sharedWithEmails?: string[];
+  qrPayload?: string;
   qrRevealed: boolean;
+}
+
+export interface TicketPurchaseRequest {
+  requestId: string;
+  amount: TicketDenomination;
+  tier: string;
+  colorClass: string;
+  paymentMethod: string;
+  createdAt: string;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  mintedTicketId?: string;
+  bankAuthCode: string;
+  statusReport: string;
 }
 
 export interface OrderReceipt {
@@ -114,4 +133,3 @@ export interface AuditLogItem {
   category: 'info' | 'sec' | 'bank' | 'warn';
   message: string;
 }
-

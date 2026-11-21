@@ -6,8 +6,10 @@ import {
   CartItem,
   OrderStatus,
   Product,
+  ProductCategory,
   StoreOrder,
   TicketDenomination,
+  TicketPurchaseRequest,
   UserAccount,
   UserRole
 } from '../models/market.models';
@@ -23,6 +25,17 @@ export class MarketStateService {
   readonly currentUser = signal<UserAccount | null>(null);
   readonly registeredUsers = signal<UserAccount[]>([]);
   readonly preselectedTicketIdFromWallet = signal<string | null>(null);
+
+  /** Estado global de búsqueda y filtros para la barra de navegación tipo MercadoLibre */
+  readonly searchQuery = signal<string>('');
+  readonly selectedCategory = signal<ProductCategory>('all');
+  readonly onlyAffordable = signal<boolean>(false);
+
+  /** Estado de conexión en vivo con CentralBank (:5050) */
+  readonly bankConnected = signal<boolean>(false);
+  readonly activeBankUrl = signal<string>(environment.bankApiUrl);
+  readonly networkModalOpen = signal<boolean>(false);
+  readonly ticketRequests = signal<TicketPurchaseRequest[]>([]);
 
   /** HUD biométrico y criptográfico estilo iOS (Face ID / Banco Central) */
   readonly hudState = signal<{ expanded: boolean; label: string; symbol: string }>({
@@ -291,14 +304,57 @@ export class MarketStateService {
 
   constructor(
     private router: Router,
-    private crypto: BankCryptoService
+    public crypto: BankCryptoService
   ) {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     this.applyTheme(media.matches);
     media.addEventListener('change', (e) => {
       if (!this.themeOverridden) this.applyTheme(e.matches);
     });
+    this.activeBankUrl.set(this.crypto.getCustomBankUrl());
     this.fetchRegisteredUsers();
+  }
+
+  async saveBankConnectionUrl(rawUrl: string): Promise<{ ok: boolean; message: string }> {
+    const norm = this.crypto.setCustomBankUrl(rawUrl);
+    this.activeBankUrl.set(norm);
+    const probe = await this.crypto.testConnection();
+    this.bankConnected.set(probe.ok);
+    if (probe.ok) {
+      this.activeBankUrl.set(probe.activeUrl);
+      await this.fetchRegisteredUsers();
+      return { ok: true, message: `Conectado a CentralBank en ${probe.activeUrl}` };
+    }
+    return {
+      ok: false,
+      message: probe.error || 'No se pudo conectar con CentralBank en esa dirección.'
+    };
+  }
+
+  searchFromNavbar(query: string, category?: ProductCategory): void {
+    this.searchQuery.set(query);
+    if (category) {
+      this.selectedCategory.set(category);
+    }
+    if (this.router.url !== '/catalog') {
+      this.router.navigateByUrl('/catalog');
+    }
+  }
+
+  selectCategoryFromNavbar(category: ProductCategory): void {
+    this.selectedCategory.set(category);
+    this.haptic('selection');
+    if (this.router.url !== '/catalog') {
+      this.router.navigateByUrl('/catalog');
+    }
+  }
+
+  toggleAffordableFromNavbar(): void {
+    this.onlyAffordable.update((v) => !v);
+    this.haptic('selection');
+    if (this.router.url !== '/catalog') {
+      this.router.navigateByUrl('/catalog');
+    }
   }
 
   private filterAuthenticTickets(raw: BankTicket[]): BankTicket[] {
@@ -325,9 +381,11 @@ export class MarketStateService {
       const data = await this.crypto.request('directory.list');
       if (data?.ok && Array.isArray(data.users)) {
         this.registeredUsers.set(data.users);
+        this.bankConnected.set(true);
+        this.activeBankUrl.set(this.crypto.getActiveBankUrl());
       }
     } catch {
-      // CentralBank puede no estar iniciado aún
+      this.bankConnected.set(false);
     }
   }
 
@@ -501,8 +559,14 @@ export class MarketStateService {
       this.tickets.set(Array.isArray(data.tickets) ? this.filterAuthenticTickets(data.tickets) : []);
       this.orders.set([]);
       this.storeCredit.set(typeof data.user.storeCredit === 'number' ? data.user.storeCredit : 0);
+      this.bankConnected.set(true);
+      this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+
       if (Array.isArray(data.users)) {
         this.registeredUsers.set(data.users);
+      }
+      if (Array.isArray(data.ticketRequests)) {
+        this.ticketRequests.set(data.ticketRequests);
       }
 
       const hudLabel =
@@ -564,8 +628,14 @@ export class MarketStateService {
         return;
       }
 
+      this.bankConnected.set(true);
+      this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+
       if (Array.isArray(data.users)) {
         this.registeredUsers.set(data.users);
+      }
+      if (Array.isArray(data.ticketRequests)) {
+        this.ticketRequests.set(data.ticketRequests);
       }
 
       const revealedIds = new Set(
@@ -728,32 +798,68 @@ export class MarketStateService {
     return bestIds;
   }
 
-  async acquireBankTicket(amount: TicketDenomination, method = 'Enlace WalletPay'): Promise<BankTicket> {
+  async acquireBankTicket(
+    amount: TicketDenomination,
+    method = 'Tarjeta Visa •••• 4821 (MarketStore)',
+    onProgress?: (msg: string) => void
+  ): Promise<BankTicket> {
     this.resetInactivityWatchdog();
-    await this.triggerBiometricPulse(`Emitiendo Ticket $${amount}...`, 900, 'building.columns');
+    await this.triggerBiometricPulse(`Solicitando Ticket $${amount}...`, 850, 'building.columns');
 
-    const data = await this.crypto.request('tickets.purchase', {
+    const data = await this.crypto.request('tickets.purchase.request', {
       amount,
       paymentMethod: method
     });
 
-    if (!data?.ok || !data.ticket) {
-      throw new Error(data?.error || 'El Banco Central rechazó la emisión del ticket.');
+    if (!data?.ok) {
+      throw new Error(data?.error || 'El Banco Central rechazó la solicitud del ticket.');
     }
 
-    const minted = data.ticket as BankTicket;
-    if (!this.crypto.isTicketAuthentic(minted)) {
-      throw new Error('El ticket recibido no superó la validación de autenticidad.');
+    if (data.ticket && !data.pendingApproval) {
+      const minted = data.ticket as BankTicket;
+      if (!this.crypto.isTicketAuthentic(minted)) {
+        throw new Error('El ticket recibido no superó la validación de autenticidad.');
+      }
+      await this.syncWithCentralBank();
+      return minted;
     }
 
-    await this.syncWithCentralBank();
+    const requestId = data.requestId;
+    if (onProgress) {
+      onProgress(`Solicitud #${requestId} enviada a CentralBank · Esperando aprobación del pago con tarjeta por el Administrador...`);
+    }
 
-    this.addAuditLog(
-      'bank',
-      `[Banco Central] Ticket ${minted.id} ($${amount} MXN) emitido y verificado.`
-    );
-    this.haptic('success');
-    return minted;
+    while (true) {
+      await new Promise((r) => setTimeout(r, 1200));
+      const statusData = await this.crypto.request('tickets.purchase.status', { requestId });
+      if (!statusData?.ok) continue;
+
+      if (statusData.approvalStatus === 'pending') {
+        if (onProgress) {
+          onProgress(`Esperando en CentralBank Desktop: Acepta el pago de tarjeta de la Solicitud #${requestId} ($${amount} MXN)...`);
+        }
+        continue;
+      }
+
+      if (statusData.approvalStatus === 'rejected') {
+        await this.syncWithCentralBank();
+        throw new Error(statusData.statusReport || 'El Administrador del Banco Central rechazó el pago de la tarjeta.');
+      }
+
+      if (statusData.approvalStatus === 'approved' && statusData.ticket) {
+        const minted = statusData.ticket as BankTicket;
+        if (!this.crypto.isTicketAuthentic(minted)) {
+          throw new Error('El ticket recibido no superó la validación de autenticidad.');
+        }
+        await this.syncWithCentralBank();
+        this.addAuditLog(
+          'bank',
+          `[Banco Central] Pago de tarjeta aprobado (#${requestId}) · Ticket ${minted.id} ($${amount} MXN) emitido.`
+        );
+        this.haptic('success');
+        return minted;
+      }
+    }
   }
 
   async importExternalTicketFolio(

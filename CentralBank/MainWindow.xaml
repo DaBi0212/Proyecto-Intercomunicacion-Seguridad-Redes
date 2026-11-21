@@ -56,7 +56,8 @@
                                         <TextBlock Text="SQLITE + API :5050 ACTIVA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
                                     </Border>
                                 </StackPanel>
-                                <TextBlock Text="Conectado en tiempo real en red local (0.0.0.0:5050) con WalletPay y MarketStore"
+                                <TextBlock x:Name="HeaderLanIpText"
+                                           Text="Conectado en tiempo real en red local (0.0.0.0:5050) con WalletPay APK y MarketStore Vercel"
                                            FontSize="11.5"
                                            Foreground="{DynamicResource TextSecondary}" />
                             </StackPanel>
@@ -658,9 +659,134 @@
                     </StackPanel>
 
                     <!-- ==========================================================================
-                         VISTA 2: VERIFICACIÓN DE AUTENTICIDAD Y APROBACIÓN DE COMPRAS DE MARKETSTORE
+                         VISTA 2: APROBACIÓN DE PAGOS DE TICKETS (WALLETPAY) Y COMPRAS DE TIENDA (MARKETSTORE)
                          ========================================================================== -->
                     <StackPanel x:Name="ViewApprovalsPanel" Visibility="Collapsed">
+                        <!-- SECCIÓN 2A: SOLICITUDES DE COMPRA DE TICKETS (VALIDACIÓN DE TARJETA EN WALLETPAY) -->
+                        <Border Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="22,18"
+                                Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="1. VALIDACIÓN DE TARJETAS Y APROBACIÓN DE COMPRA DE TICKETS · WALLETPAY APK"
+                                           FontSize="10.5"
+                                           FontWeight="Bold"
+                                           Foreground="#34C759" />
+                                <TextBlock Text="Solicitudes de Compra de Tickets (Aprobación de Pago con Tarjeta)"
+                                           FontSize="20"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,2,0,4" />
+                                <TextBlock Text="Cuando un usuario desea comprar un ticket ($50, $100, $200 o $500 MXN) en WalletPay, el pago debe ser validado aquí por el Administrador del Banco para autorizar la tarjeta y emitir el certificado."
+                                           FontSize="12.5"
+                                           Foreground="{DynamicResource TextSecondary}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="EmptyTicketRequestsState"
+                                Background="{DynamicResource BgCardElevated}"
+                                BorderBrush="{DynamicResource IosSeparator}"
+                                BorderThickness="1"
+                                CornerRadius="18"
+                                Padding="28,26"
+                                Margin="0,0,0,20"
+                                Visibility="Visible">
+                            <StackPanel HorizontalAlignment="Center" MaxWidth="560">
+                                <TextBlock Text="No hay solicitudes de compra de tickets pendientes de aprobación"
+                                           FontSize="16.5"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,4" />
+                                <TextBlock Text="Cuando un usuario seleccione un ticket en WalletPay y solicite comprarlo, la operación aparecerá aquí al instante para que aceptes o rechaces el pago de su tarjeta."
+                                           FontSize="12.5"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl x:Name="TicketRequestsItemsControl" Margin="0,0,0,22">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource BgCardElevated}"
+                                            BorderBrush="{DynamicResource IosSeparator}"
+                                            BorderThickness="1"
+                                            CornerRadius="18"
+                                            Padding="22,18"
+                                            Margin="0,0,0,12">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                        <Border Background="{DynamicResource SoftGreen}" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding RequestId, StringFormat='SOLICITUD DE TICKET #{0}'}" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="#28B44B" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding TimestampFull}" FontSize="12.5" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding UserName, StringFormat='Titular: {0}'}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+                                                    <TextBlock Text="{Binding UserEmail}" FontSize="12.5" Foreground="{DynamicResource TextSecondary}" />
+                                                </StackPanel>
+
+                                                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top">
+                                                    <Border Background="{DynamicResource SoftAmber}" CornerRadius="9" Padding="11,5" HorizontalAlignment="Right" Margin="0,0,0,6">
+                                                        <TextBlock Text="{Binding StatusPillText}" FontSize="11" FontWeight="Bold" Foreground="#D97706" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding AmountFormatted}" FontSize="22" FontWeight="Bold" Foreground="#28B44B" HorizontalAlignment="Right" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Border Background="{DynamicResource BgCell}" CornerRadius="12" Padding="14,11" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                        <TextBlock Text="CERTIFICADO SOLICITADO EN WALLETPAY" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding TicketTitle}" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Margin="0,3,0,0" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="MÉTODO DE PAGO / TARJETA A VALIDAR" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextTertiary}" />
+                                                        <TextBlock Text="{Binding PaymentMethod}" FontFamily="Consolas" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource IosBlue}" Margin="0,3,0,0" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <Border Background="{DynamicResource SoftBlue}" CornerRadius="10" Padding="12,8" Margin="0,0,0,12">
+                                                <TextBlock Text="{Binding StatusReport}"
+                                                           FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource IosBlue}"
+                                                           TextWrapping="Wrap" />
+                                            </Border>
+
+                                            <StackPanel Orientation="Horizontal"
+                                                        HorizontalAlignment="Right"
+                                                        Visibility="{Binding IsPending, Converter={StaticResource BoolToVisConv}}">
+                                                <Button Style="{StaticResource ApplePrimaryBtn}"
+                                                        Background="#34C759"
+                                                        Padding="18,9"
+                                                        Margin="0,0,10,0"
+                                                        Tag="{Binding RequestId}"
+                                                        Click="OnApproveTicketPurchaseRequestClick"
+                                                        Content="✓ Aceptar Pago de Tarjeta y Emitir Ticket" />
+                                                <Button Style="{StaticResource AppleSecondaryBtn}"
+                                                        Foreground="#FF3B30"
+                                                        Padding="14,9"
+                                                        Tag="{Binding RequestId}"
+                                                        Click="OnRejectTicketPurchaseRequestClick"
+                                                        Content="✕ Rechazar Pago" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- SECCIÓN 2B: SOLICITUDES DE COMPRA DE PRODUCTOS EN MARKETSTORE -->
                         <Border Background="{DynamicResource BgCardElevated}"
                                 BorderBrush="{DynamicResource IosSeparator}"
                                 BorderThickness="1"
@@ -668,12 +794,12 @@
                                 Padding="22,18"
                                 Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="CENTRO DE AUTORIZACIÓN BANCARIA · CONEXIÓN EN VIVO CON MARKETSTORE"
+                                <TextBlock Text="2. CENTRO DE AUTORIZACIÓN DE COMPRAS · CONEXIÓN EN VIVO CON MARKETSTORE (VERCEL)"
                                            FontSize="10.5"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource IosBlue}" />
-                                <TextBlock Text="Verificación de Autenticidad de Tickets y Aprobación de Compras"
-                                           FontSize="21"
+                                <TextBlock Text="Verificación de Autenticidad de Tickets y Aprobación de Compras en Tienda"
+                                           FontSize="20"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimary}"
                                            Margin="0,2,0,4" />

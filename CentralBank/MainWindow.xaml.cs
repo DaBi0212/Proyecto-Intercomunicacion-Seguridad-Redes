@@ -57,6 +57,19 @@ public partial class MainWindow : Window
             });
         };
 
+        _state.PendingTicketRequestCreated += pendingReq =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                _state.ReloadFromDatabase();
+                RefreshAllViews();
+                SwitchMainTab("APPROVALS");
+                _ = TriggerDynamicIslandHudAsync($"¡Validar tarjeta! {pendingReq.UserName} solicita Ticket de ${pendingReq.Amount} (#{pendingReq.RequestId})");
+            });
+        };
+
+        HeaderLanIpText.Text = $"IP Red Local activa: http://{CentralBankApiServer.GetLocalLanIp()}:5050/api · Local: http://localhost:5050/api (WalletPay APK + MarketStore Vercel)";
+
         // Temporizador de sincronización continua con SQLite para reflejar cualquier cambio al instante
         _liveSyncTimer = new System.Windows.Threading.DispatcherTimer
         {
@@ -67,7 +80,8 @@ public partial class MainWindow : Window
             var prevTxCount = _state.Transactions.Count;
             var prevTicketCount = _state.Tickets.Count;
             var prevOrderCount = _state.Orders.Count;
-            var prevPendingCount = _state.PendingOrdersCount;
+            var prevPendingCount = _state.TotalPendingApprovalsCount;
+            var prevReqCount = _state.TicketRequests.Count;
             var prevUserCount = _state.Users.Count;
 
             _state.ReloadFromDatabase();
@@ -75,7 +89,8 @@ public partial class MainWindow : Window
             if (_state.Transactions.Count != prevTxCount ||
                 _state.Tickets.Count != prevTicketCount ||
                 _state.Orders.Count != prevOrderCount ||
-                _state.PendingOrdersCount != prevPendingCount ||
+                _state.TotalPendingApprovalsCount != prevPendingCount ||
+                _state.TicketRequests.Count != prevReqCount ||
                 _state.Users.Count != prevUserCount)
             {
                 RefreshAllViews();
@@ -108,6 +123,8 @@ public partial class MainWindow : Window
         var unusedCount = _state.UnusedTicketsCount;
         var usedCount = _state.UsedTicketsCount;
         var pendingOrders = _state.PendingOrdersCount;
+        var pendingTicketReqs = _state.PendingTicketRequestsCount;
+        var totalPending = _state.TotalPendingApprovalsCount;
 
         KpiTotalCapitalValue.Text = $"${totalCap:N2} MXN";
         KpiTotalCapitalSub.Text = $"{totalTickets} tickets vendidos en WalletPay";
@@ -122,16 +139,14 @@ public partial class MainWindow : Window
             ? "Verificados y aprobados en MarketStore"
             : $"{_state.RedemptionRatePercent:F1}% ya usados en MarketStore · 0 doble gasto";
 
-        KpiUsersAndTxValue.Text = $"{_state.Users.Count} Usuarios · {pendingOrders} Pendientes";
-        KpiUsersAndTxSub.Text = $"{_state.Transactions.Count} movimientos en base de datos SQLite";
+        KpiUsersAndTxValue.Text = $"{_state.Users.Count} Usuarios · {totalPending} Pendientes";
+        KpiUsersAndTxSub.Text = $"{pendingTicketReqs} tarjetas por aprobar · {pendingOrders} compras tienda";
 
-        // Actualizar banner de alerta superior cuando hay compras de MarketStore esperando aprobación
-        if (pendingOrders > 0)
+        // Actualizar banner de alerta superior cuando hay pagos de tickets o compras de MarketStore esperando aprobación
+        if (totalPending > 0)
         {
             LivePendingOrdersAlertBanner.Visibility = Visibility.Visible;
-            LivePendingAlertTitle.Text = pendingOrders == 1
-                ? "Hay 1 compra de MarketStore pendiente de verificación de tickets y aprobación bancaria"
-                : $"Hay {pendingOrders} compras de MarketStore pendientes de verificación de tickets y aprobación bancaria";
+            LivePendingAlertTitle.Text = $"Hay {totalPending} operación(es) pendientes ({pendingTicketReqs} compra(s) de ticket y {pendingOrders} orden(es) de MarketStore)";
         }
         else
         {
@@ -140,9 +155,9 @@ public partial class MainWindow : Window
 
         // Actualizar textos de pestañas
         TabBtnTransactions.Content = $"Historial de Transacciones ({_state.Transactions.Count})";
-        TabBtnApprovals.Content = pendingOrders > 0
-            ? $"Aprobar Compras Tienda ({pendingOrders} Pendiente)"
-            : $"Aprobar Compras Tienda ({_state.Orders.Count})";
+        TabBtnApprovals.Content = totalPending > 0
+            ? $"Aprobar Tarjetas y Compras ({totalPending} Pend.)"
+            : $"Aprobar Tarjetas y Compras ({_state.TicketRequests.Count + _state.Orders.Count})";
         TabBtnTickets.Content = $"Tickets ({unusedCount} Sin Usar · {usedCount} Usados)";
 
         RebuildUserFilterPills();
@@ -310,10 +325,37 @@ public partial class MainWindow : Window
 
     private void RefreshApprovalsList()
     {
+        var ticketReqs = _state.TicketRequests.ToList();
+        TicketRequestsItemsControl.ItemsSource = null;
+        TicketRequestsItemsControl.ItemsSource = ticketReqs;
+        EmptyTicketRequestsState.Visibility = ticketReqs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
         var orders = _state.Orders.ToList();
         OrdersApprovalItemsControl.ItemsSource = null;
         OrdersApprovalItemsControl.ItemsSource = orders;
         EmptyOrdersApprovalState.Visibility = orders.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnApproveTicketPurchaseRequestClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string requestId)
+        {
+            var (ok, msg, minted) = _state.ApproveTicketPurchaseRequest(requestId);
+            RefreshAllViews();
+            _ = TriggerDynamicIslandHudAsync(ok && minted != null
+                ? $"Pago aprobado (#{requestId}) · Ticket {minted.Id} (${minted.Amount}) emitido"
+                : $"No se pudo aprobar #{requestId}: {msg}");
+        }
+    }
+
+    private void OnRejectTicketPurchaseRequestClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string requestId)
+        {
+            _state.RejectTicketPurchaseRequest(requestId, "Pago de tarjeta rechazado manualmente por el Administrador del Banco Central.");
+            RefreshAllViews();
+            _ = TriggerDynamicIslandHudAsync($"Pago de tarjeta #{requestId} rechazado");
+        }
     }
 
     private void OnVerifyOrderTicketsAuthenticityClick(object sender, RoutedEventArgs e)

@@ -20,6 +20,8 @@ export interface BankTicket {
   status: TicketStatus;
   issuedAt: string;
   usedAt?: string;
+  usedByName?: string;
+  usedByEmail?: string;
   orderId?: string;
   signatureHash: string;
   signature?: string;
@@ -27,6 +29,23 @@ export interface BankTicket {
   qrRevealed: boolean;
   ownerName?: string;
   ownerEmail?: string;
+  isShared?: boolean;
+  isSharedWithMe?: boolean;
+  sharedWithEmails?: string[];
+  qrPayload?: string;
+}
+
+export interface TicketPurchaseRequest {
+  requestId: string;
+  amount: TicketDenomination;
+  tier: string;
+  colorClass: string;
+  paymentMethod: string;
+  createdAt: string;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  mintedTicketId?: string;
+  bankAuthCode: string;
+  statusReport: string;
 }
 
 export interface WalletTransaction {
