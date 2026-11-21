@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace CentralBank;
@@ -23,10 +24,23 @@ public partial class App : Application
 
         DispatcherUnhandledException += (s, e) =>
         {
+            // Evitar que cualquier excepción de interfaz o concurrencia cierre la aplicación del Banco Central
+            e.Handled = true;
             try
             {
                 var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
-                File.AppendAllText(logPath, $"[DISPATCHER ERROR {DateTime.Now}] {e.Exception}\n");
+                File.AppendAllText(logPath, $"[DISPATCHER RECOVERED {DateTime.Now}] {e.Exception}\n");
+            }
+            catch { }
+        };
+
+        TaskScheduler.UnobservedTaskException += (s, e) =>
+        {
+            e.SetObserved();
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+                File.AppendAllText(logPath, $"[TASK RECOVERED {DateTime.Now}] {e.Exception}\n");
             }
             catch { }
         };

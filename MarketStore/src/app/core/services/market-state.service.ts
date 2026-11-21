@@ -31,7 +31,7 @@ export class MarketStateService {
   readonly selectedCategory = signal<ProductCategory>('all');
   readonly onlyAffordable = signal<boolean>(false);
 
-  /** Estado de conexión en vivo con CentralBank (:5050) */
+  /** Estado de conexión en vivo con CentralBank (:7070) */
   readonly bankConnected = signal<boolean>(false);
   readonly activeBankUrl = signal<string>(environment.bankApiUrl);
   readonly networkModalOpen = signal<boolean>(false);
@@ -312,7 +312,54 @@ export class MarketStateService {
       if (!this.themeOverridden) this.applyTheme(e.matches);
     });
     this.activeBankUrl.set(this.crypto.getCustomBankUrl());
+    this.loadLocalDeviceAccounts();
     this.fetchRegisteredUsers();
+  }
+
+  /**
+   * Carga únicamente las cuentas que se hayan autenticado o vinculado en ESTE dispositivo/navegador,
+   * garantizando que ninguna cuenta de otro dispositivo aparezca ni se mezcle.
+   */
+  private loadLocalDeviceAccounts(): void {
+    try {
+      const raw = localStorage.getItem('ms_local_device_accounts_v2');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.registeredUsers.set(parsed);
+          return;
+        }
+      }
+    } catch {}
+    this.registeredUsers.set([]);
+  }
+
+  private rememberLocalDeviceAccount(user: UserAccount): void {
+    if (!user || !user.email) return;
+    const cleanEmail = user.email.trim().toLowerCase();
+    const current = this.registeredUsers().filter((u) => u.email.trim().toLowerCase() !== cleanEmail);
+    const updated: UserAccount[] = [
+      {
+        ...user,
+        email: cleanEmail
+      },
+      ...current
+    ];
+    this.registeredUsers.set(updated);
+    try {
+      localStorage.setItem('ms_local_device_accounts_v2', JSON.stringify(updated));
+    } catch {}
+  }
+
+  removeLocalDeviceAccount(email: string): void {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) return;
+    this.crypto.removeProtectedItem(`devpass_${clean}`);
+    const filtered = this.registeredUsers().filter((u) => u.email.trim().toLowerCase() !== clean);
+    this.registeredUsers.set(filtered);
+    try {
+      localStorage.setItem('ms_local_device_accounts_v2', JSON.stringify(filtered));
+    } catch {}
   }
 
   async saveBankConnectionUrl(rawUrl: string): Promise<{ ok: boolean; message: string }> {
@@ -377,12 +424,12 @@ export class MarketStateService {
   }
 
   async fetchRegisteredUsers(): Promise<void> {
+    this.loadLocalDeviceAccounts();
     try {
-      const data = await this.crypto.request('directory.list');
-      if (data?.ok && Array.isArray(data.users)) {
-        this.registeredUsers.set(data.users);
-        this.bankConnected.set(true);
-        this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+      const probe = await this.crypto.testConnection();
+      this.bankConnected.set(probe.ok);
+      if (probe.ok && probe.activeUrl) {
+        this.activeBankUrl.set(probe.activeUrl);
       }
     } catch {
       this.bankConnected.set(false);
@@ -466,7 +513,7 @@ export class MarketStateService {
       this.jwtToken = data.deviceToken || 'session-active';
       this.currentUser.set(user);
       this.isAuthenticated.set(true);
-      if (Array.isArray(data.users)) this.registeredUsers.set(data.users);
+      this.rememberLocalDeviceAccount(user);
       if (Array.isArray(data.tickets)) this.tickets.set(this.filterAuthenticTickets(data.tickets));
       if (ticketId) {
         this.preselectedTicketIdFromWallet.set(ticketId);
@@ -561,10 +608,8 @@ export class MarketStateService {
       this.storeCredit.set(typeof data.user.storeCredit === 'number' ? data.user.storeCredit : 0);
       this.bankConnected.set(true);
       this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+      this.rememberLocalDeviceAccount(user);
 
-      if (Array.isArray(data.users)) {
-        this.registeredUsers.set(data.users);
-      }
       if (Array.isArray(data.ticketRequests)) {
         this.ticketRequests.set(data.ticketRequests);
       }
@@ -597,7 +642,7 @@ export class MarketStateService {
     } catch {
       return {
         ok: false,
-        error: 'No se pudo conectar con el Banco Central (:5050). Asegúrate de que CentralBank esté abierto.'
+        error: 'No se pudo conectar con el Banco Central (:7070). Asegúrate de que CentralBank esté abierto.'
       };
     }
   }
@@ -631,8 +676,8 @@ export class MarketStateService {
       this.bankConnected.set(true);
       this.activeBankUrl.set(this.crypto.getActiveBankUrl());
 
-      if (Array.isArray(data.users)) {
-        this.registeredUsers.set(data.users);
+      if (data.user) {
+        this.rememberLocalDeviceAccount({ ...data.user, role: user.role });
       }
       if (Array.isArray(data.ticketRequests)) {
         this.ticketRequests.set(data.ticketRequests);
@@ -907,7 +952,7 @@ export class MarketStateService {
     } catch {
       return {
         ok: false,
-        message: 'No se pudo conectar con CentralBank (:5050).'
+        message: 'No se pudo conectar con CentralBank (:7070).'
       };
     }
   }
@@ -1001,7 +1046,7 @@ export class MarketStateService {
     } catch {
       return {
         ok: false,
-        error: 'No se pudo conectar con CentralBank Desktop (:5050). Asegúrate de que la aplicación CentralBank esté abierta.'
+        error: 'No se pudo conectar con CentralBank Desktop (:7070). Asegúrate de que la aplicación CentralBank esté abierta.'
       };
     }
 

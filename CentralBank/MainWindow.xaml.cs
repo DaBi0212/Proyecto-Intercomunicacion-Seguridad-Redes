@@ -54,9 +54,16 @@ public partial class MainWindow : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
-                _state.ReloadFromDatabase();
-                RefreshAllViews();
-                _ = TriggerDynamicIslandHudAsync(summary);
+                try
+                {
+                    lock (_state.SyncRoot)
+                    {
+                        _state.ReloadFromDatabase();
+                        RefreshAllViews();
+                    }
+                    _ = TriggerDynamicIslandHudAsync(summary);
+                }
+                catch { }
             });
         };
 
@@ -64,10 +71,17 @@ public partial class MainWindow : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
-                _state.ReloadFromDatabase();
-                RefreshAllViews();
-                SwitchMainTab("APPROVALS");
-                _ = TriggerDynamicIslandHudAsync($"¡Nueva compra #{pendingOrder.OrderId} en MarketStore espera verificación!");
+                try
+                {
+                    lock (_state.SyncRoot)
+                    {
+                        _state.ReloadFromDatabase();
+                        RefreshAllViews();
+                    }
+                    SwitchMainTab("APPROVALS");
+                    _ = TriggerDynamicIslandHudAsync($"¡Nueva compra #{pendingOrder.OrderId} en MarketStore espera verificación!");
+                }
+                catch { }
             });
         };
 
@@ -75,10 +89,17 @@ public partial class MainWindow : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
-                _state.ReloadFromDatabase();
-                RefreshAllViews();
-                SwitchMainTab("APPROVALS");
-                _ = TriggerDynamicIslandHudAsync($"¡Validar tarjeta! {pendingReq.UserName} solicita Ticket de ${pendingReq.Amount} (#{pendingReq.RequestId})");
+                try
+                {
+                    lock (_state.SyncRoot)
+                    {
+                        _state.ReloadFromDatabase();
+                        RefreshAllViews();
+                    }
+                    SwitchMainTab("APPROVALS");
+                    _ = TriggerDynamicIslandHudAsync($"¡Validar tarjeta! {pendingReq.UserName} solicita Ticket de ${pendingReq.Amount} (#{pendingReq.RequestId})");
+                }
+                catch { }
             });
         };
 
@@ -99,24 +120,31 @@ public partial class MainWindow : Window
         };
         _liveSyncTimer.Tick += (_, _) =>
         {
-            var prevTxCount = _state.Transactions.Count;
-            var prevTicketCount = _state.Tickets.Count;
-            var prevOrderCount = _state.Orders.Count;
-            var prevPendingCount = _state.TotalPendingApprovalsCount;
-            var prevReqCount = _state.TicketRequests.Count;
-            var prevUserCount = _state.Users.Count;
-
-            _state.ReloadFromDatabase();
-
-            if (_state.Transactions.Count != prevTxCount ||
-                _state.Tickets.Count != prevTicketCount ||
-                _state.Orders.Count != prevOrderCount ||
-                _state.TotalPendingApprovalsCount != prevPendingCount ||
-                _state.TicketRequests.Count != prevReqCount ||
-                _state.Users.Count != prevUserCount)
+            try
             {
-                RefreshAllViews();
+                lock (_state.SyncRoot)
+                {
+                    var prevTxCount = _state.Transactions.Count;
+                    var prevTicketCount = _state.Tickets.Count;
+                    var prevOrderCount = _state.Orders.Count;
+                    var prevPendingCount = _state.TotalPendingApprovalsCount;
+                    var prevReqCount = _state.TicketRequests.Count;
+                    var prevUserCount = _state.Users.Count;
+
+                    _state.ReloadFromDatabase();
+
+                    if (_state.Transactions.Count != prevTxCount ||
+                        _state.Tickets.Count != prevTicketCount ||
+                        _state.Orders.Count != prevOrderCount ||
+                        _state.TotalPendingApprovalsCount != prevPendingCount ||
+                        _state.TicketRequests.Count != prevReqCount ||
+                        _state.Users.Count != prevUserCount)
+                    {
+                        RefreshAllViews();
+                    }
+                }
             }
+            catch { }
         };
         _liveSyncTimer.Start();
 
@@ -136,7 +164,9 @@ public partial class MainWindow : Window
 
     private void RefreshAllViews()
     {
-        _state.RecalculateUserMetrics();
+        lock (_state.SyncRoot)
+        {
+            _state.RecalculateUserMetrics();
 
         var totalCap = _state.TotalCapitalFromTicketSales;
         var unusedCap = _state.UnusedTicketsCapital;
@@ -189,8 +219,9 @@ public partial class MainWindow : Window
         RefreshCapitalAndUsersView();
         RebuildQuickAuditPills();
 
-        AuditLogsItemsControl.ItemsSource = null;
-        AuditLogsItemsControl.ItemsSource = _state.AuditLogs.Take(15).ToList();
+            AuditLogsItemsControl.ItemsSource = null;
+            AuditLogsItemsControl.ItemsSource = _state.AuditLogs.Take(15).ToList();
+        }
     }
 
     // =========================================================================

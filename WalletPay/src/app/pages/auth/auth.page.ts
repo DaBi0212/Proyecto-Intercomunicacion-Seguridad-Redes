@@ -48,11 +48,10 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 
         @if (wallet.registeredUsers().length > 0 && !isRegistering()) {
           <section class="accounts-box">
-            <span class="sec-label">PERSONAS REGISTRADAS EN BANCO CENTRAL</span>
+            <span class="sec-label">MI CUENTA GUARDADA EN ESTE DISPOSITIVO</span>
             <div class="accounts-list">
               @for (u of wallet.registeredUsers(); track u.email) {
-                <button
-                  type="button"
+                <div
                   class="account-pill continuous apple-pressable"
                   [class.selected]="email.toLowerCase() === u.email.toLowerCase()"
                   (click)="selectRegisteredUser(u)"
@@ -62,12 +61,20 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
                   </span>
                   <div class="ac-meta">
                     <strong>{{ u.name }}</strong>
-                    <span>{{ u.email }}</span>
+                    <span>{{ u.email }} · Este dispositivo</span>
                   </div>
                   @if (email.toLowerCase() === u.email.toLowerCase()) {
                     <sf-symbol name="checkmark" [size]="16" [weight]="2.6" />
                   }
-                </button>
+                  <button
+                    type="button"
+                    class="forget-btn"
+                    title="Olvidar cuenta de este dispositivo"
+                    (click)="$event.stopPropagation(); forgetDeviceAccount(u.email)"
+                  >
+                    <sf-symbol name="xmark" [size]="12" [weight]="2.4" />
+                  </button>
+                </div>
               }
             </div>
           </section>
@@ -357,6 +364,18 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .forget-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 0;
+      background: rgba(142, 142, 147, 0.18);
+      color: var(--ios-label-2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
 
     .mode-segmented {
       --r: 11px;
@@ -501,7 +520,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 export class AuthPage implements OnInit {
   readonly wallet = inject(WalletStateService);
 
-  readonly usePassword = signal(false);
+  readonly usePassword = signal(true);
   readonly isRegistering = signal(false);
   readonly busy = signal(false);
   readonly error = signal('');
@@ -520,6 +539,12 @@ export class AuthPage implements OnInit {
 
   ngOnInit(): void {
     this.wallet.fetchRegisteredUsers();
+    const localAccs = this.wallet.registeredUsers();
+    if (localAccs.length > 0 && !this.email) {
+      this.selectRegisteredUser(localAccs[0]);
+    } else {
+      this.usePassword.set(true);
+    }
     this.autoDiscoverTimer = setInterval(() => {
       if (!this.wallet.isAuthenticated() && !this.wallet.bankConnected()) {
         this.wallet.fetchRegisteredUsers();
@@ -548,9 +573,18 @@ export class AuthPage implements OnInit {
   }
 
   showNameField(): boolean {
-    const clean = this.email.trim().toLowerCase();
-    if (!clean) return true;
-    return !this.wallet.registeredUsers().some((u) => u.email.toLowerCase() === clean);
+    return this.isRegistering();
+  }
+
+  forgetDeviceAccount(emailToRemove: string): void {
+    this.wallet.haptic('light');
+    this.wallet.removeLocalDeviceAccount(emailToRemove);
+    if (this.email.trim().toLowerCase() === emailToRemove.trim().toLowerCase()) {
+      this.email = '';
+      this.fullName = '';
+      this.password = '';
+      this.usePassword.set(true);
+    }
   }
 
   displayActiveName(): string {

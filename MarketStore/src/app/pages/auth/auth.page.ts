@@ -156,14 +156,13 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             </div>
           </div>
 
-          <!-- Lista de Personas Registradas en la Base de Datos SQLite (Multi-Usuario) -->
+          <!-- Lista de Personas Guardadas Localmente en ESTE Dispositivo (Privacidad Multi-Dispositivo) -->
           @if (market.registeredUsers().length > 0 && !isRegistering()) {
             <div class="registered-box">
-              <span class="role-label">2. CUENTAS REGISTRADAS EN BANCO CENTRAL / WALLETPAY</span>
+              <span class="role-label">2. MI CUENTA GUARDADA EN ESTE DISPOSITIVO</span>
               <div class="registered-list">
                 @for (u of market.registeredUsers(); track u.email) {
-                  <button
-                    type="button"
+                  <div
                     class="reg-user-pill continuous apple-pressable"
                     [class.selected]="email.toLowerCase() === u.email.toLowerCase()"
                     (click)="selectRegisteredUser(u)"
@@ -174,13 +173,21 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
                     <div class="prof-meta">
                       <strong>{{ u.name }}</strong>
                       <span>
-                        {{ u.email }} · Cuenta verificada
+                        {{ u.email }} · Este dispositivo
                       </span>
                     </div>
                     @if (email.toLowerCase() === u.email.toLowerCase()) {
                       <sf-symbol name="checkmark" [size]="16" [weight]="2.6" />
                     }
-                  </button>
+                    <button
+                      type="button"
+                      class="forget-btn"
+                      title="Olvidar cuenta de este dispositivo"
+                      (click)="$event.stopPropagation(); forgetDeviceAccount(u.email)"
+                    >
+                      <sf-symbol name="xmark" [size]="12" [weight]="2.4" />
+                    </button>
+                  </div>
                 }
               </div>
             </div>
@@ -699,6 +706,19 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .forget-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 0;
+      background: rgba(142, 142, 147, 0.18);
+      color: var(--ios-label-2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
 
     .actions {
       display: flex;
@@ -807,7 +827,7 @@ export class AuthPage implements OnInit {
   readonly market = inject(MarketStateService);
 
   readonly selectedRole = signal<UserRole>('buyer');
-  readonly usePassword = signal(false);
+  readonly usePassword = signal(true);
   readonly isRegistering = signal(false);
   readonly busy = signal(false);
   readonly error = signal('');
@@ -835,6 +855,8 @@ export class AuthPage implements OnInit {
     const users = this.market.registeredUsers();
     if (users.length > 0 && !this.email) {
       this.selectRegisteredUser(users[0]);
+    } else if (users.length === 0) {
+      this.usePassword.set(true);
     }
   }
 
@@ -857,9 +879,18 @@ export class AuthPage implements OnInit {
   }
 
   showNameInput(): boolean {
-    const clean = this.email.trim().toLowerCase();
-    if (!clean) return true;
-    return !this.market.registeredUsers().some((u) => u.email.toLowerCase() === clean);
+    return this.isRegistering();
+  }
+
+  forgetDeviceAccount(emailToRemove: string): void {
+    this.market.haptic('light');
+    this.market.removeLocalDeviceAccount(emailToRemove);
+    if (this.email.trim().toLowerCase() === emailToRemove.trim().toLowerCase()) {
+      this.email = '';
+      this.customName = '';
+      this.password = '';
+      this.usePassword.set(true);
+    }
   }
 
   displaySelectedName(): string {
@@ -957,7 +988,7 @@ export class AuthPage implements OnInit {
     }
 
     this.busy.set(true);
-    const isNewAccount = this.isRegistering() || this.showNameInput();
+    const isNewAccount = this.isRegistering();
     const res = await this.market.authenticateAccount({
       mode: isNewAccount ? 'register' : 'login',
       role: this.selectedRole(),

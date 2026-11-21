@@ -1039,7 +1039,7 @@ export class StorePage {
     this.currentRequestId.set('');
     this.state.set('waiting_approval');
     this.approvalProgressText.set(
-      'Conectando con CentralBank Desktop (:5050) para validar tu tarjeta...'
+      'Conectando con CentralBank Desktop (:7070) para validar tu tarjeta...'
     );
 
     const result = await this.wallet.requestAndWaitTicketPurchaseApproval(

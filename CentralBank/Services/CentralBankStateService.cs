@@ -41,6 +41,8 @@ public class CentralBankStateService
     public List<PendingOrderApprovalRecord> Orders { get; private set; } = new();
     public List<AuditLogEntry> AuditLogs { get; private set; } = new();
 
+    public object SyncRoot => _dbLock;
+
     public event Action<string>? StateChanged;
     public event Action<PendingOrderApprovalRecord>? PendingOrderCreated;
     public event Action<PendingTicketPurchaseRecord>? PendingTicketRequestCreated;
@@ -61,7 +63,7 @@ public class CentralBankStateService
         }
 
         _dbFilePath = Path.Combine(dbDir, "centralbank.db");
-        _connectionString = $"Data Source={_dbFilePath}";
+        _connectionString = $"Data Source={_dbFilePath};Default Timeout=10;Pooling=True";
 
         Security = new SecurityService(dbDir);
 
@@ -103,6 +105,10 @@ public class CentralBankStateService
 
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
+                PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=NORMAL;
+                PRAGMA busy_timeout=10000;
+
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -1622,6 +1628,11 @@ public class CentralBankStateService
                 foreach (var tid in rawIds)
                 {
                     var tk = Tickets.FirstOrDefault(t => t.Id.Equals(tid, StringComparison.OrdinalIgnoreCase));
+                    if (tk == null)
+                    {
+                        doubleSpentTicket = tid;
+                        break;
+                    }
 
                     using (var upTk = conn.CreateCommand())
                     {

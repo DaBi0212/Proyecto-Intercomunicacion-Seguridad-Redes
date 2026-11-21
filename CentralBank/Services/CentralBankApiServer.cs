@@ -583,8 +583,12 @@ public class CentralBankApiServer : IDisposable
             ? p
             : ParseJsonBody("{}");
 
-        var (status, responseObj) = DispatchSecureAction(session, action, payload, remoteIp);
-        await WriteEncryptedAsync(stream, session, status, responseObj);
+        (int status, object responseObj) result;
+        lock (_state.SyncRoot)
+        {
+            result = DispatchSecureAction(session, action, payload, remoteIp);
+        }
+        await WriteEncryptedAsync(stream, session, result.status, result.responseObj);
     }
 
     private static async Task WriteEncryptedAsync(NetworkStream stream, SecureSession session, int statusCode, object responsePayload)
@@ -610,10 +614,8 @@ public class CentralBankApiServer : IDisposable
         {
             case "directory.list":
             {
-                _state.ReloadFromDatabase();
-                // Directorio público mínimo para el selector de acceso: sin saldos ni conteos financieros.
-                var directory = _state.Users.Select(MapUserForDirectory).ToList();
-                return (200, new { ok = true, users = directory });
+                // Por privacidad y aislamiento multi-dispositivo, no se devuelve la lista global de cuentas de otros dispositivos.
+                return (200, new { ok = true, users = Array.Empty<object>() });
             }
 
             case "auth.register":
@@ -830,7 +832,7 @@ public class CentralBankApiServer : IDisposable
                     ok = true,
                     storeCredit = user.StoreCredit,
                     user = MapUserForFrontend(user),
-                    users = _state.Users.Select(MapUserForDirectory).ToList(),
+                    users = new[] { MapUserForDirectory(user) },
                     tickets,
                     ticketRequests,
                     transactions = txs,
@@ -1133,7 +1135,7 @@ public class CentralBankApiServer : IDisposable
             ok = true,
             deviceToken,
             user = MapUserForFrontend(user),
-            users = _state.Users.Select(MapUserForDirectory).ToList(),
+            users = new[] { MapUserForDirectory(user) },
             tickets = userTickets,
             ticketRequests = userTicketRequests,
             transactions = userTxs

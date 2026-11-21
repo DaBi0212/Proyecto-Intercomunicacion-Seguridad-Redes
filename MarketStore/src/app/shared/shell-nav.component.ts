@@ -526,13 +526,13 @@ import { SfSymbolComponent } from './sf-symbol.component';
     </nav>
 
     <!-- ============================================================================
-         MODAL DE CONFIGURACIÓN DE IP DEL BANCO CENTRAL (:5050) DESDE VERCEL
+         MODAL DE CONFIGURACIÓN DE IP DEL BANCO CENTRAL (:7070) DESDE VERCEL
          ============================================================================ -->
     @if (netModalOpen()) {
       <div class="ml-drawer-scrim" (click)="netModalOpen.set(false)" role="presentation"></div>
       <div class="net-config-modal continuous" role="dialog" aria-modal="true">
         <div class="ncm-head">
-          <strong>Conexión con Banco Central (:5050)</strong>
+          <strong>Conexión con Banco Central (:7070)</strong>
           <button type="button" class="mmd-close" (click)="netModalOpen.set(false)">
             <sf-symbol name="xmark" [size]="13" [weight]="2.6" />
           </button>

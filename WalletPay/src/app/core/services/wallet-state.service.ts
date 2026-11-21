@@ -91,7 +91,59 @@ export class WalletStateService {
     });
     this.activeBankUrl.set(this.crypto.getCustomBankUrl());
     this.activeStoreUrl.set(this.crypto.getMarketStoreUrl());
+    this.loadLocalDeviceAccounts();
     this.fetchRegisteredUsers();
+  }
+
+  /**
+   * Carga únicamente las cuentas que han iniciado sesión físicamente en ESTE dispositivo móvil,
+   * garantizando privacidad absoluta: ninguna cuenta de otro dispositivo aparece aquí.
+   */
+  private loadLocalDeviceAccounts(): void {
+    try {
+      const raw = localStorage.getItem('wp_local_device_accounts_v2');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.registeredUsers.set(parsed);
+          return;
+        }
+      }
+    } catch {}
+    this.registeredUsers.set([]);
+  }
+
+  private rememberLocalDeviceAccount(user: Partial<WalletUserAccount> & { email: string }): void {
+    if (!user || !user.email) return;
+    const cleanEmail = user.email.trim().toLowerCase();
+    const current = this.registeredUsers().filter((u) => u.email.trim().toLowerCase() !== cleanEmail);
+    const updated: WalletUserAccount[] = [
+      {
+        id: user.id || `USR-${cleanEmail.substring(0, 4).toUpperCase()}`,
+        name: user.name || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        avatarInitials: user.avatarInitials || this.currentUserInitials(),
+        avatarHex: user.avatarHex || '#007AFF',
+        unusedTicketsCount: user.unusedTicketsCount || 0,
+        unusedBalance: user.unusedBalance || 0
+      },
+      ...current
+    ];
+    this.registeredUsers.set(updated);
+    try {
+      localStorage.setItem('wp_local_device_accounts_v2', JSON.stringify(updated));
+    } catch {}
+  }
+
+  removeLocalDeviceAccount(email: string): void {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) return;
+    this.crypto.removeProtectedItem(`devpass_${clean}`);
+    const filtered = this.registeredUsers().filter((u) => u.email.trim().toLowerCase() !== clean);
+    this.registeredUsers.set(filtered);
+    try {
+      localStorage.setItem('wp_local_device_accounts_v2', JSON.stringify(filtered));
+    } catch {}
   }
 
   async saveNetworkSettings(bankUrl: string, storeUrl: string): Promise<{ ok: boolean; message: string }> {
@@ -161,12 +213,12 @@ export class WalletStateService {
   }
 
   async fetchRegisteredUsers(): Promise<void> {
+    this.loadLocalDeviceAccounts();
     try {
-      const data = await this.crypto.request('directory.list');
-      if (data?.ok && Array.isArray(data.users)) {
-        this.registeredUsers.set(data.users);
-        this.bankConnected.set(true);
-        this.activeBankUrl.set(this.crypto.getActiveBankUrl());
+      const probe = await this.crypto.testConnection();
+      this.bankConnected.set(probe.ok);
+      if (probe.ok && probe.activeUrl) {
+        this.activeBankUrl.set(probe.activeUrl);
       }
     } catch {
       this.bankConnected.set(false);
@@ -259,7 +311,19 @@ export class WalletStateService {
       const resolvedName = data.user?.name || params.name?.trim() || email.split('@')[0];
       this.currentUserEmail.set(email);
       this.currentUserName.set(resolvedName);
-      if (Array.isArray(data.users)) this.registeredUsers.set(data.users);
+      if (data.user) {
+        this.rememberLocalDeviceAccount(data.user);
+      } else {
+        this.rememberLocalDeviceAccount({
+          id: `USR-${email.substring(0, 4).toUpperCase()}`,
+          name: resolvedName,
+          email,
+          avatarInitials: this.currentUserInitials(),
+          avatarHex: '#007AFF',
+          unusedTicketsCount: 0,
+          unusedBalance: 0
+        });
+      }
       if (Array.isArray(data.tickets)) this.tickets.set(this.filterAuthenticTickets(data.tickets));
       if (Array.isArray(data.ticketRequests)) this.ticketRequests.set(data.ticketRequests);
       if (Array.isArray(data.transactions)) this.transactions.set(data.transactions);
@@ -274,10 +338,10 @@ export class WalletStateService {
       return { ok: true };
     } catch {
       this.bankConnected.set(false);
-      this.addAuditLog('warn', 'No se pudo conectar con CentralBank (:5050).');
+      this.addAuditLog('warn', 'No se pudo conectar con CentralBank (:7070).');
       return {
         ok: false,
-        error: `No se pudo conectar con CentralBank (${this.crypto.getCustomBankUrl()}). Verifica que CentralBank.exe esté abierto o configura la IP del servidor.`
+        error: `No se pudo conectar con CentralBank (${this.crypto.getCustomBankUrl()}). Verifica que CentralBank.exe esté abierto.`
       };
     }
   }
@@ -307,8 +371,8 @@ export class WalletStateService {
       this.bankConnected.set(true);
       this.activeBankUrl.set(this.crypto.getActiveBankUrl());
 
-      if (Array.isArray(data.users)) {
-        this.registeredUsers.set(data.users);
+      if (data.user) {
+        this.rememberLocalDeviceAccount(data.user);
       }
 
       const revealedIds = new Set(
@@ -402,7 +466,7 @@ export class WalletStateService {
     } catch {
       return {
         ok: false,
-        error: 'No se pudo conectar con CentralBank (:5050). Verifica que el software del banco esté abierto.'
+        error: 'No se pudo conectar con CentralBank (:7070). Verifica que el software del banco esté abierto.'
       };
     }
 
@@ -534,7 +598,7 @@ export class WalletStateService {
       await this.haptic('error');
       return {
         ok: false,
-        message: 'No se pudo conectar con el Banco Central (:5050) para verificar el código QR.'
+        message: 'No se pudo conectar con el Banco Central (:7070) para verificar el código QR.'
       };
     }
   }

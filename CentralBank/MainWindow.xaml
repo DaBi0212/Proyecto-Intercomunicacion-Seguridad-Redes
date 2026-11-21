@@ -1028,7 +1028,7 @@
                                             <Grid Margin="0,0,0,16">
                                                 <StackPanel>
                                                     <TextBlock Text="VALOR NOMINAL FIJO" FontSize="10" FontWeight="Bold" Foreground="#B8FFFFFF" />
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Baseline">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding AmountFormatted}" FontSize="36" FontWeight="Bold" Foreground="White" />
                                                         <TextBlock Text=" MXN" FontSize="14" FontWeight="SemiBold" Foreground="#CCFFFFFF" VerticalAlignment="Bottom" Margin="4,0,0,5" />
                                                     </StackPanel>
