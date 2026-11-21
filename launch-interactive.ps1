@@ -16,7 +16,7 @@ if ($p) {
 }
 
 try {
-    $res = Invoke-RestMethod -Uri "http://127.0.0.1:5050/api/health" -TimeoutSec 3
+    $res = Invoke-RestMethod -Uri "http://127.0.0.1:7070/api/health" -TimeoutSec 3
     Write-Host "API Health Response:" ($res | ConvertTo-Json -Compress)
 } catch {
     Write-Host "Health check error: $($_.Exception.Message)"
