@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $action = New-ScheduledTaskAction -Execute "C:\Users\david\Desktop\Proyecto Redes\CentralBank\bin\Release\net10.0-windows\CentralBank.exe" -WorkingDirectory "C:\Users\david\Desktop\Proyecto Redes\CentralBank\bin\Release\net10.0-windows"
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive

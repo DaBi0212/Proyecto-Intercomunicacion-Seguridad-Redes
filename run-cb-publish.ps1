@@ -1,4 +1,4 @@
-﻿$binDir = "C:\Users\david\Desktop\Proyecto Redes\CentralBank\bin\Release\net10.0-windows\publish"
+$binDir = "C:\Users\david\Desktop\Proyecto Redes\CentralBank\bin\Release\net10.0-windows\publish"
 $exePath = Join-Path $binDir "CentralBank.exe"
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
