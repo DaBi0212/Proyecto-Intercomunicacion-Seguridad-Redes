@@ -548,17 +548,17 @@ import { SfSymbolComponent } from './sf-symbol.component';
           <input
             type="text"
             class="mono"
-            placeholder="http://192.168.1.74:5050/api"
+            placeholder="http://192.168.1.74:7070/api"
             [(ngModel)]="bankUrlInput"
           />
         </label>
 
         <div class="ncm-presets">
-          <button type="button" class="ncm-chip" (click)="bankUrlInput = 'http://192.168.1.74:5050/api'">
-            Wi-Fi PC (192.168.1.74:5050)
+          <button type="button" class="ncm-chip" (click)="bankUrlInput = 'http://192.168.1.74:7070/api'">
+            Wi-Fi PC (192.168.1.74:7070)
           </button>
-          <button type="button" class="ncm-chip" (click)="bankUrlInput = 'http://localhost:5050/api'">
-            Localhost (:5050)
+          <button type="button" class="ncm-chip" (click)="bankUrlInput = 'http://localhost:7070/api'">
+            Localhost (:7070)
           </button>
         </div>
 
