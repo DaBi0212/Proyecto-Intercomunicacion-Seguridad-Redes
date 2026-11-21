@@ -31,6 +31,18 @@ public partial class App : Application
             catch { }
         };
     }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+            File.AppendAllText(logPath, $"[STARTUP {DateTime.Now}] CentralBank iniciándose...\n");
+        }
+        catch { }
+    }
 }
+
 
 
