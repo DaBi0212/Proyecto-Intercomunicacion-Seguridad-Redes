@@ -57,7 +57,7 @@
                                     </Border>
                                 </StackPanel>
                                 <TextBlock x:Name="HeaderLanIpText"
-                                           Text="Conectado en tiempo real en red local (0.0.0.0:5050) con WalletPay APK y MarketStore Vercel"
+                                           Text="Conectado en tiempo real en red local (0.0.0.0:7070) con WalletPay APK y MarketStore Vercel"
                                            FontSize="11.5"
                                            Foreground="{DynamicResource TextSecondary}" />
                             </StackPanel>
