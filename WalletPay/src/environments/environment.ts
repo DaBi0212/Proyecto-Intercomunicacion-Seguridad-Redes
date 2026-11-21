@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  bankApiUrl: 'http://192.168.1.74:5050/api',
+  bankApiUrl: 'http://192.168.1.74:7070/api',
   marketStoreUrl: 'https://proyecto-intercomunicacion-segurida.vercel.app',
   discoveryUrl: 'https://ntfy.sh/aetherpay_cb_dabi0212_net/raw?poll=1&since=all',
   githubDiscoveryUrl: 'https://raw.githubusercontent.com/DaBi0212/Proyecto-Intercomunicacion-Seguridad-Redes/main/bank-discovery.json',
