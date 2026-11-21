@@ -39,31 +39,42 @@ public class CentralBankApiServer : IDisposable
     private readonly HandoffStore _handoffs = new();
     private readonly CancellationTokenSource _cts = new();
     private TcpListener? _tcpListener;
+    private Process? _tunnelProcess;
     private bool _isRunning;
 
-    public string BaseUrl { get; } = "http://0.0.0.0:5050/";
+    public const string DiscoveryChannelUrl = "https://ntfy.sh/aetherpay_cb_dabi0212_net";
+    public const string VercelStoreProductionUrl = "https://proyecto-intercomunicacion-segurida.vercel.app";
 
-    public static string GetLocalLanIp()
+    public string BaseUrl { get; } = "http://0.0.0.0:5050/";
+    public string PublicHttpsTunnelUrl { get; private set; } = string.Empty;
+    public event Action<string>? TunnelUrlPublished;
+
+    public static List<string> GetAllLocalLanIps()
     {
         try
         {
             var host = Dns.GetHostEntry(Dns.GetHostName());
-            var candidates = host.AddressList
+            return host.AddressList
                 .Where(ip => ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
                 .Select(ip => ip.ToString())
+                .Distinct()
                 .ToList();
-
-            var wifiLan = candidates.FirstOrDefault(ip =>
-                ip.StartsWith("192.168.1.", StringComparison.Ordinal) ||
-                ip.StartsWith("192.168.0.", StringComparison.Ordinal) ||
-                ip.StartsWith("10.", StringComparison.Ordinal));
-
-            return wifiLan ?? candidates.FirstOrDefault() ?? "127.0.0.1";
         }
         catch
         {
-            return "192.168.1.74";
+            return new List<string> { "192.168.1.74" };
         }
+    }
+
+    public static string GetLocalLanIp()
+    {
+        var candidates = GetAllLocalLanIps();
+        var wifiLan = candidates.FirstOrDefault(ip =>
+            ip.StartsWith("192.168.1.", StringComparison.Ordinal) ||
+            ip.StartsWith("192.168.0.", StringComparison.Ordinal) ||
+            ip.StartsWith("10.", StringComparison.Ordinal));
+
+        return wifiLan ?? candidates.FirstOrDefault() ?? "127.0.0.1";
     }
 
     public CentralBankApiServer(CentralBankStateService state)
@@ -76,16 +87,158 @@ public class CentralBankApiServer : IDisposable
         if (_isRunning) return;
         try
         {
+            TryOpenWindowsFirewallPort();
             _tcpListener = new TcpListener(IPAddress.Any, 5050);
             _tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             _tcpListener.Start();
             _isRunning = true;
             _ = Task.Run(() => AcceptClientsLoopAsync(_cts.Token));
+            _ = Task.Run(() => StartAutomaticPublicTunnelAndDiscoveryAsync(_cts.Token));
         }
         catch (Exception ex)
         {
             _state.AddAuditLog("WARN", "#FF9500", $"[Servidor API] No se pudo iniciar en puerto 5050: {ex.Message}");
         }
+    }
+
+    private static void TryOpenWindowsFirewallPort()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "netsh",
+                Arguments = "advfirewall firewall add rule name=\"CentralBank_API_5050\" dir=in action=allow protocol=TCP localport=5050",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var p = Process.Start(psi);
+            p?.WaitForExit(1500);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Inicia automáticamente un túnel HTTPS público (Cloudflare Quick Tunnel) y publica el endpoint
+    /// en el registro automático en la nube para que MarketStore (en Vercel) y WalletPay (APK móvil)
+    /// se conecten desde CUALQUIER dispositivo sin configurar ninguna dirección IP manualmente.
+    /// </summary>
+    private async Task StartAutomaticPublicTunnelAndDiscoveryAsync(CancellationToken token)
+    {
+        // Publicar de inmediato las IPs locales mientras el túnel HTTPS se levanta
+        await PublishDiscoveryEndpointsAsync("");
+
+        try
+        {
+            var cfCandidates = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cloudflared.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CentralBankTunnel", "cloudflared.exe"),
+                "cloudflared.exe"
+            };
+
+            var cfBinary = cfCandidates.FirstOrDefault(File.Exists);
+            if (string.IsNullOrEmpty(cfBinary))
+            {
+                return;
+            }
+
+            // Cerrar túneles previos huérfanos si existieran
+            foreach (var old in Process.GetProcessesByName("cloudflared"))
+            {
+                try { old.Kill(); } catch { }
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = cfBinary,
+                Arguments = "tunnel --url http://127.0.0.1:5050 --no-autoupdate",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            _tunnelProcess = Process.Start(psi);
+            if (_tunnelProcess == null) return;
+
+            var urlRegex = new Regex(@"https://[a-zA-Z0-9-]+\.trycloudflare\.com", RegexOptions.Compiled);
+
+            async Task ReadStreamAsync(StreamReader reader)
+            {
+                while (!token.IsCancellationRequested && !_tunnelProcess.HasExited)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (line == null) break;
+                    var match = urlRegex.Match(line);
+                    if (match.Success && string.IsNullOrEmpty(PublicHttpsTunnelUrl))
+                    {
+                        PublicHttpsTunnelUrl = $"{match.Value}/api";
+                        _state.AddAuditLog("NET", "#34C759", $"[Auto-Descubrimiento Global] Túnel HTTPS activo ({PublicHttpsTunnelUrl}). Sincronizado automáticamente con Vercel y WalletPay APK.");
+                        await PublishDiscoveryEndpointsAsync(PublicHttpsTunnelUrl);
+                        TunnelUrlPublished?.Invoke(PublicHttpsTunnelUrl);
+                    }
+                }
+            }
+
+            _ = Task.Run(() => ReadStreamAsync(_tunnelProcess.StandardError), token);
+            _ = Task.Run(() => ReadStreamAsync(_tunnelProcess.StandardOutput), token);
+
+            // Republicar periódicamente cada 45 segundos para mantener fresco el descubrimiento automático
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(45), token);
+                await PublishDiscoveryEndpointsAsync(PublicHttpsTunnelUrl);
+            }
+        }
+        catch
+        {
+            // Si no hay internet para túnel público, continúa operando en red local automáticamente
+        }
+    }
+
+    private async Task PublishDiscoveryEndpointsAsync(string httpsApiUrl)
+    {
+        try
+        {
+            var lanIp = GetLocalLanIp();
+            var lanUrl = $"http://{lanIp}:5050/api";
+            var allLanUrls = GetAllLocalLanIps().Select(ip => $"http://{ip}:5050/api").ToArray();
+
+            var payloadObj = new
+            {
+                httpsUrl = httpsApiUrl,
+                lanUrl,
+                allLanUrls,
+                storeUrl = VercelStoreProductionUrl,
+                ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+            var json = JsonSerializer.Serialize(payloadObj);
+
+            // 1. Guardar archivo local bank-discovery.json en la raíz del repositorio (para GitHub raw / Auto-Sync)
+            try
+            {
+                var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+                while (dir != null)
+                {
+                    if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(dir.FullName, "bank-discovery.json"), json, Encoding.UTF8);
+                        break;
+                    }
+                    dir = dir.Parent;
+                }
+            }
+            catch { }
+
+            // 2. Publicar instantáneamente en canal de descubrimiento HTTPS sin configuración
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+            using var content = new StringContent(json, Encoding.UTF8, "text/plain");
+            await http.PostAsync(DiscoveryChannelUrl, content);
+        }
+        catch { }
     }
 
     private async Task AcceptClientsLoopAsync(CancellationToken token)
