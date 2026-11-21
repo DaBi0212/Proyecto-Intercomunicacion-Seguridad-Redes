@@ -1434,7 +1434,7 @@
                                     CornerRadius="18"
                                     Padding="20,18">
                                 <StackPanel>
-                                    <TextBlock Text="BITÁCORA DE EVENTOS SQLITE Y SERVIDOR API (:5050)"
+                                    <TextBlock Text="BITÁCORA DE EVENTOS SQLITE Y SERVIDOR API (:7070)"
                                                FontSize="11"
                                                FontWeight="Bold"
                                                Foreground="{DynamicResource TextSecondary}"
