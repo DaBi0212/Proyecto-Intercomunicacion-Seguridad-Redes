@@ -131,16 +131,16 @@ export class BankCryptoService {
     ]);
 
     // Localhost y 127.0.0.1 son permitidos por navegadores de escritorio incluso desde HTTPS (Vercel)
-    urls.add('http://localhost:5050/api');
-    urls.add('http://127.0.0.1:5050/api');
+    urls.add('http://localhost:7070/api');
+    urls.add('http://127.0.0.1:7070/api');
 
     if (!isHttpsPage) {
       urls.add(environment.bankApiUrl);
-      urls.add('http://192.168.1.74:5050/api');
+      urls.add('http://192.168.1.74:7070/api');
       if (typeof window !== 'undefined' && window.location?.hostname) {
         const host = window.location.hostname;
         if (host !== 'localhost' && host !== '127.0.0.1' && !host.includes('vercel.app')) {
-          urls.add(`http://${host}:5050/api`);
+          urls.add(`http://${host}:7070/api`);
         }
       }
     }
