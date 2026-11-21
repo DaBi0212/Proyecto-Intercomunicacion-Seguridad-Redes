@@ -89,15 +89,15 @@ public class CentralBankApiServer : IDisposable
         try
         {
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
-            File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Intentando abrir puerto 5050...\n");
+            File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Intentando abrir puerto {DefaultPort}...\n");
 
             TryOpenWindowsFirewallPort();
-            _tcpListener = new TcpListener(IPAddress.Any, 5050);
+            _tcpListener = new TcpListener(IPAddress.Any, DefaultPort);
             _tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             _tcpListener.Start();
             _isRunning = true;
 
-            File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Puerto 5050 ABIERTO Y ESCUCHANDO EXITOSAMENTE.\n");
+            File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Puerto {DefaultPort} ABIERTO Y ESCUCHANDO EXITOSAMENTE.\n");
 
             _ = Task.Run(() => AcceptClientsLoopAsync(_cts.Token));
             _ = Task.Run(() => StartAutomaticPublicTunnelAndDiscoveryAsync(_cts.Token));
@@ -106,7 +106,7 @@ public class CentralBankApiServer : IDisposable
         {
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
             File.AppendAllText(logPath, $"[APISERVER START ERROR {DateTime.Now}] {ex}\n");
-            _state.AddAuditLog("WARN", "#FF9500", $"[Servidor API] No se pudo iniciar en puerto 5050: {ex.Message}");
+            _state.AddAuditLog("WARN", "#FF9500", $"[Servidor API] No se pudo iniciar en puerto {DefaultPort}: {ex.Message}");
         }
     }
 
