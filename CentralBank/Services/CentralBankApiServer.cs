@@ -213,8 +213,8 @@ public class CentralBankApiServer : IDisposable
         try
         {
             var lanIp = GetLocalLanIp();
-            var lanUrl = $"http://{lanIp}:5050/api";
-            var allLanUrls = GetAllLocalLanIps().Select(ip => $"http://{ip}:5050/api").ToArray();
+            var lanUrl = $"http://{lanIp}:{DefaultPort}/api";
+            var allLanUrls = GetAllLocalLanIps().Select(ip => $"http://{ip}:{DefaultPort}/api").ToArray();
 
             var payloadObj = new
             {
