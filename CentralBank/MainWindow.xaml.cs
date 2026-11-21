@@ -68,7 +68,15 @@ public partial class MainWindow : Window
             });
         };
 
-        HeaderLanIpText.Text = $"IP Red Local activa: http://{CentralBankApiServer.GetLocalLanIp()}:5050/api · Local: http://localhost:5050/api (WalletPay APK + MarketStore Vercel)";
+        HeaderLanIpText.Text = $"Auto-Conexión Activa (0 Configuración Manual) · LAN: {CentralBankApiServer.GetLocalLanIp()}:5050 · Conectando túnel HTTPS para Vercel y móviles...";
+        _apiServer.TunnelUrlPublished += httpsUrl =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                HeaderLanIpText.Text = $"Auto-Conexión Global Activa · Túnel HTTPS: {httpsUrl} · LAN: {CentralBankApiServer.GetLocalLanIp()}:5050";
+                _ = TriggerDynamicIslandHudAsync("Túnel HTTPS Público Activo · Conectado con Vercel y Móviles");
+            });
+        };
 
         // Temporizador de sincronización continua con SQLite para reflejar cualquier cambio al instante
         _liveSyncTimer = new System.Windows.Threading.DispatcherTimer

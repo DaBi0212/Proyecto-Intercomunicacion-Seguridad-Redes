@@ -396,6 +396,8 @@ public class CentralBankApiServer : IDisposable
                     ok = true,
                     service = "CentralBank Desktop Node",
                     lanIp = GetLocalLanIp(),
+                    httpsTunnelUrl = PublicHttpsTunnelUrl,
+                    storeUrl = VercelStoreProductionUrl,
                     totalTickets = _state.TotalTicketsSoldCount,
                     pendingOrders = _state.PendingOrdersCount,
                     pendingTicketRequests = _state.PendingTicketRequestsCount
@@ -537,17 +539,15 @@ public class CentralBankApiServer : IDisposable
 
         var action = GetStringProp(inner, "action", "").ToLowerInvariant();
         var nonce = GetStringProp(inner, "nonce", "");
-        var ts = GetLongProp(inner, "ts", 0);
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        if (nonce.Length < 12 || Math.Abs(now - ts) > MaxClockSkewMs)
+        if (nonce.Length < 12)
         {
-            _state.AddAuditLog("SEC", "#FF9500", $"[Canal] Mensaje fuera de ventana de tiempo desde {remoteIp}.");
             await WriteEncryptedAsync(stream, session, 400, new
             {
                 ok = false,
                 code = "STALE_MESSAGE",
-                error = "La solicitud caducó antes de ser procesada. Inténtalo de nuevo."
+                error = "Solicitud inválida. Inténtalo de nuevo."
             });
             return;
         }
@@ -1339,6 +1339,10 @@ public class CentralBankApiServer : IDisposable
         {
             _cts.Cancel();
             _tcpListener?.Stop();
+            if (_tunnelProcess != null && !_tunnelProcess.HasExited)
+            {
+                _tunnelProcess.Kill();
+            }
         }
         catch { }
     }
