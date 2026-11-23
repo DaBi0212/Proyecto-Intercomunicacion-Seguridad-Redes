@@ -1,6 +1,18 @@
 export type TicketDenomination = 50 | 100 | 200 | 500;
 export type TicketStatus = 'active' | 'used' | 'expired';
 
+export interface SavedUserCard {
+  id: string;
+  title: string;
+  sub: string;
+  icon: string;
+  tint: string;
+  fullCardNumber: string;
+  expiry: string;
+  cvc: string;
+  alias?: string;
+}
+
 export interface WalletUserAccount {
   id: string;
   name: string;
@@ -9,6 +21,7 @@ export interface WalletUserAccount {
   avatarHex?: string;
   unusedTicketsCount?: number;
   unusedBalance?: number;
+  savedCardsJson?: string;
 }
 
 export interface BankTicket {

@@ -6,7 +6,8 @@ import {
   TicketPurchaseRequest,
   WalletTransaction,
   AuditLogItem,
-  WalletUserAccount
+  WalletUserAccount,
+  SavedUserCard
 } from '../models/wallet.models';
 import { environment } from '../../../environments/environment';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
@@ -57,6 +58,7 @@ export class WalletStateService {
   readonly tickets = signal<BankTicket[]>([]);
   readonly ticketRequests = signal<TicketPurchaseRequest[]>([]);
   readonly transactions = signal<WalletTransaction[]>([]);
+  readonly savedUserCards = signal<SavedUserCard[]>([]);
   readonly auditLogs = signal<AuditLogItem[]>([]);
 
   readonly activeTickets = computed(() => this.tickets().filter((t) => t.status === 'active'));
@@ -143,6 +145,70 @@ export class WalletStateService {
     this.registeredUsers.set(filtered);
     try {
       localStorage.setItem('wp_local_device_accounts_v2', JSON.stringify(filtered));
+    } catch {}
+  }
+
+  private loadAccountCards(email: string, serverSavedCardsJson?: string): void {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) {
+      this.savedUserCards.set([]);
+      return;
+    }
+
+    // 1. Si el servidor devolvió tarjetas vinculadas a la cuenta en SQLite, usarlas y guardarlas en caché local de la cuenta
+    if (serverSavedCardsJson && serverSavedCardsJson !== '[]') {
+      try {
+        const parsed = JSON.parse(serverSavedCardsJson);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.savedUserCards.set(parsed);
+          localStorage.setItem(`wp_account_cards_${clean}`, JSON.stringify(parsed));
+          return;
+        }
+      } catch {}
+    }
+
+    // 2. Cargar del almacenamiento local exclusivo de este correo
+    try {
+      const localRaw = localStorage.getItem(`wp_account_cards_${clean}`);
+      if (localRaw) {
+        const parsed = JSON.parse(localRaw);
+        if (Array.isArray(parsed)) {
+          this.savedUserCards.set(parsed);
+          // Sincronizar hacia el servidor si el servidor aún no las tenía
+          if (parsed.length > 0 && (!serverSavedCardsJson || serverSavedCardsJson === '[]')) {
+            this.crypto.request('user.cards.save', { cards: parsed }).catch(() => {});
+          }
+          return;
+        }
+      }
+    } catch {}
+
+    this.savedUserCards.set([]);
+  }
+
+  async addOrUpdateUserCard(card: SavedUserCard): Promise<void> {
+    const cleanEmail = this.currentUserEmail().trim().toLowerCase();
+    if (!cleanEmail) return;
+    const updated = [card, ...this.savedUserCards().filter((c) => c.id !== card.id)];
+    this.savedUserCards.set(updated);
+    try {
+      localStorage.setItem(`wp_account_cards_${cleanEmail}`, JSON.stringify(updated));
+    } catch {}
+    try {
+      await this.crypto.request('user.cards.save', { cards: updated });
+    } catch {}
+  }
+
+  async removeUserCard(cardId: string): Promise<void> {
+    const cleanEmail = this.currentUserEmail().trim().toLowerCase();
+    if (!cleanEmail) return;
+    const updated = this.savedUserCards().filter((c) => c.id !== cardId);
+    this.savedUserCards.set(updated);
+    try {
+      localStorage.setItem(`wp_account_cards_${cleanEmail}`, JSON.stringify(updated));
+    } catch {}
+    try {
+      await this.crypto.request('user.cards.save', { cards: updated });
     } catch {}
   }
 
@@ -311,6 +377,7 @@ export class WalletStateService {
       const resolvedName = data.user?.name || params.name?.trim() || email.split('@')[0];
       this.currentUserEmail.set(email);
       this.currentUserName.set(resolvedName);
+      this.loadAccountCards(email, data.user?.savedCardsJson);
       if (data.user) {
         this.rememberLocalDeviceAccount(data.user);
       } else {
