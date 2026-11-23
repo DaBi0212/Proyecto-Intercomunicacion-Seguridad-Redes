@@ -1483,26 +1483,18 @@
                     CornerRadius="26"
                     Padding="32,30">
                 <StackPanel HorizontalAlignment="Center">
-                    <Border Width="64" Height="64" CornerRadius="18" Background="{DynamicResource IosBlue}" HorizontalAlignment="Center" Margin="0,0,0,16">
-                        <Viewbox Width="32" Height="32">
-                            <Canvas Width="24" Height="24">
-                                <Path Data="M7 3H5A2 2 0 0 0 3 5V7 M17 3H19A2 2 0 0 1 21 5V7 M7 21H5A2 2 0 0 1 3 19V17 M17 21H19A2 2 0 0 0 21 19V17 M8.5 9V10.5 M15.5 9V10.5 M12 9V13.2H11 M9 16C9.8 16.7 10.8 17 12 17C13.2 17 14.2 16.7 15 16"
-                                      Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                            </Canvas>
-                        </Viewbox>
-                    </Border>
+                    <Image Source="pack://application:,,,/Assets/centralbank-vertical.png"
+                           Height="64"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,14"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
 
                     <TextBlock Text="CONSOLA EXCLUSIVA DE ADMINISTRADOR"
                                FontSize="10.5"
                                FontWeight="Bold"
                                Foreground="{DynamicResource IosBlue}"
-                               HorizontalAlignment="Center" />
-                    <TextBlock Text="CentralBank Desktop"
-                               FontSize="24"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource TextPrimary}"
                                HorizontalAlignment="Center"
-                               Margin="0,4,0,6" />
+                               Margin="0,0,0,6" />
                     <TextBlock x:Name="AdminLockSubtitle"
                                Text="Autoridad emisora y auditora de tickets electrónicos para WalletPay y MarketStore. Ingresa tu clave de administrador para desbloquear el Libro Mayor."
                                FontSize="12.5"
