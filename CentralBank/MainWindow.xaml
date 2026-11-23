@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="CentralBank · Consola Maestra de Administración (SQLite + API en Tiempo Real)"
+        Icon="pack://application:,,,/Assets/centralbank.ico"
         Width="1420"
         Height="900"
         MinWidth="1140"
@@ -39,26 +40,34 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Identidad del Banco Central -->
+                        <!-- Identidad del Banco Central con los logos oficiales -->
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource IosBlue}" Margin="0,0,12,0">
-                                <Viewbox Width="20" Height="20">
-                                    <Canvas Width="24" Height="24">
-                                        <Path Data="M3 9.5L12 4L21 9.5Z" Stroke="White" StrokeThickness="2" StrokeLineJoin="Round" />
-                                        <Path Data="M5.5 11V18 M10 11V18 M14 11V18 M18.5 11V18 M3 20.5H21" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                    </Canvas>
-                                </Viewbox>
+                            <Border CornerRadius="11"
+                                    Background="{DynamicResource BgCardElevated}"
+                                    BorderBrush="{DynamicResource IosSeparator}"
+                                    BorderThickness="1"
+                                    Padding="8,5"
+                                    Margin="0,0,12,0"
+                                    VerticalAlignment="Center">
+                                <Image Source="pack://application:,,,/Assets/centralbank-vertical.png"
+                                       Height="34"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Banco Central" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
-                                    <Border Background="{DynamicResource SoftGreen}" CornerRadius="6" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <Image Source="pack://application:,,,/Assets/centralbank-horizontal.png"
+                                           Height="22"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <Border Background="{DynamicResource SoftGreen}" CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
                                         <TextBlock Text="SQLITE + API :7070 ACTIVA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
                                     </Border>
                                 </StackPanel>
                                 <TextBlock x:Name="HeaderLanIpText"
                                            Text="Conectado en tiempo real en red local (0.0.0.0:7070) con WalletPay APK y MarketStore Vercel"
                                            FontSize="11.5"
+                                           Margin="0,2,0,0"
                                            Foreground="{DynamicResource TextSecondary}" />
                             </StackPanel>
                         </StackPanel>
@@ -199,13 +208,9 @@
                                 Margin="0,0,12,0">
                             <StackPanel>
                                 <Grid Margin="0,0,0,10">
-                                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SoftGreen}" HorizontalAlignment="Left">
-                                        <Viewbox Width="18" Height="18">
-                                            <Canvas Width="24" Height="24">
-                                                <Path Data="M3 9.5L12 4L21 9.5Z M5.5 11V18 M10 11V18 M14 11V18 M18.5 11V18 M3 20.5H21"
-                                                      Stroke="#34C759" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                                            </Canvas>
-                                        </Viewbox>
+                                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SoftBlue}" HorizontalAlignment="Left" Padding="5">
+                                        <Image Source="pack://application:,,,/Assets/centralbank-mark.png"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
                                     </Border>
                                     <Border Background="{DynamicResource SoftGreen}" CornerRadius="8" Padding="8,3" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Text="CAPITAL TOTAL VENTA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
@@ -997,16 +1002,12 @@
                                         <StackPanel>
                                             <Grid Margin="0,0,0,16">
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Border Width="32" Height="32" CornerRadius="9" Background="#28FFFFFF" Margin="0,0,10,0">
-                                                        <Viewbox Width="16" Height="16">
-                                                            <Canvas Width="24" Height="24">
-                                                                <Path Data="M3 9.5L12 4L21 9.5Z M5.5 11V18 M10 11V18 M14 11V18 M18.5 11V18 M3 20.5H21"
-                                                                      Stroke="White" StrokeThickness="2.1" StrokeLineJoin="Round" />
-                                                            </Canvas>
-                                                        </Viewbox>
+                                                    <Border Width="32" Height="32" CornerRadius="9" Background="#28FFFFFF" Margin="0,0,10,0" Padding="5">
+                                                        <Image Source="pack://application:,,,/Assets/centralbank-mark-white.png"
+                                                               RenderOptions.BitmapScalingMode="HighQuality" />
                                                     </Border>
                                                     <StackPanel VerticalAlignment="Center">
-                                                        <TextBlock Text="BANCO CENTRAL" FontSize="11.5" FontWeight="Bold" Foreground="White" />
+                                                        <TextBlock Text="CENTRAL BANK" FontSize="11.5" FontWeight="Bold" Foreground="White" />
                                                         <TextBlock Text="{Binding TierUpper}" FontSize="10" Foreground="#CCFFFFFF" />
                                                     </StackPanel>
                                                 </StackPanel>
