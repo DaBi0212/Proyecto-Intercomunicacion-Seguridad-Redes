@@ -3,7 +3,7 @@ import { CurrencyPipe, UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MarketStateService } from '../../core/services/market-state.service';
-import { BankTicket, TicketDenomination } from '../../core/models/market.models';
+import { BankTicket, SavedUserCard, TicketDenomination } from '../../core/models/market.models';
 import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 import { generateQrSvgData } from '../../core/utils/qr-generator';
 
