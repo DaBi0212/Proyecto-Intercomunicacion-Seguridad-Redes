@@ -485,12 +485,16 @@ export class WalletStateService {
     if (!this.isAuthenticated() || !this.currentUserEmail()) return;
 
     try {
-      const data = await this.crypto.request('state.sync');
+      let data = await this.crypto.request('state.sync');
       if (!data?.ok) {
         if (data?.code === 'UNAUTHORIZED') {
-          this.lockSession('La sesión expiró en el Banco Central');
+          // Reconectar la sesión automáticamente en segundo plano sin cerrar la sesión del usuario
+          const reauthed = await this.trySilentReauth();
+          if (reauthed) {
+            data = await this.crypto.request('state.sync');
+          }
         }
-        return;
+        if (!data?.ok) return;
       }
 
       this.bankConnected.set(true);
@@ -530,6 +534,7 @@ export class WalletStateService {
   }
 
   lockSession(reason = 'Cambio de usuario / Cierre de sesión'): void {
+    this.clearPersistedSession();
     this.crypto.request('auth.logout').catch(() => {});
     this.jwtToken = null;
     this.isAuthenticated.set(false);
@@ -545,12 +550,8 @@ export class WalletStateService {
   }
 
   resetInactivityWatchdog(): void {
+    // La sesión permanece activa indefinidamente hasta que el usuario cierre sesión manualmente.
     if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
-    this.inactivityTimer = setTimeout(() => {
-      if (this.isAuthenticated()) {
-        this.lockSession('Caducidad automática tras 5 minutos de inactividad');
-      }
-    }, environment.sessionTimeoutMs);
   }
 
   /**
