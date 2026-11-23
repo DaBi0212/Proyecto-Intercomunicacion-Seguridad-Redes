@@ -25,7 +25,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             <div class="hero-actions">
               <button type="button" class="hero-btn-primary continuous apple-pressable" (click)="goToWallet()">
                 <sf-symbol name="wallet.pass" [size]="18" [weight]="2" />
-                <span>Adquirir o Ver Tickets ({{ market.activeTickets().length }})</span>
+                <span>Mis Tickets WalletPay ({{ market.activeTickets().length }})</span>
               </button>
               <button type="button" class="hero-btn-secondary continuous apple-pressable" (click)="market.cartOpen.set(true)">
                 <sf-symbol name="bag" [size]="18" />

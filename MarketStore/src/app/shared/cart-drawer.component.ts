@@ -165,68 +165,35 @@ type CheckoutStep = 'bag' | 'tickets' | 'verifying' | 'receipt';
             <div class="sec-head-inline">
               <span>Mis Tickets en WalletPay ({{ market.activeTickets().length }} disponibles)</span>
               <button type="button" class="link-btn" (click)="showManualInput.set(!showManualInput())">
-                {{ showManualInput() ? 'Ocultar folio manual' : '+ Ingresar folio o adquirir' }}
+                {{ showManualInput() ? 'Ocultar folio manual' : '+ Validar folio TKT de WalletPay' }}
               </button>
             </div>
 
-            <!-- Panel desplegable para importar folio externo o emitir ticket rápido del Banco Central -->
+            <!-- Panel desplegable para importar folio externo desde WalletPay -->
             @if (showManualInput() || market.activeTickets().length === 0) {
               <div class="quick-bank-box continuous">
-                <div class="qb-tabs">
-                  <button
-                    type="button"
-                    class="qb-tab"
-                    [class.active]="bankHelperMode() === 'mint'"
-                    (click)="bankHelperMode.set('mint')"
-                  >
-                    Adquirir Ticket Rápido
-                  </button>
-                  <button
-                    type="button"
-                    class="qb-tab"
-                    [class.active]="bankHelperMode() === 'folio'"
-                    (click)="bankHelperMode.set('folio')"
-                  >
-                    Validar Folio TKT
+                <p class="qb-desc">
+                  La compra de tickets se realiza exclusivamente en la app móvil <strong>WalletPay</strong>. Si tienes un folio de ticket emitido en WalletPay, ingrésalo aquí para verificarlo:
+                </p>
+                <div class="folio-form">
+                  <input
+                    type="text"
+                    class="ios-input mono"
+                    placeholder="Ej. TKT-8420-A1B2"
+                    [(ngModel)]="manualFolio"
+                  />
+                  <select class="ios-select" [(ngModel)]="manualAmount">
+                    <option [ngValue]="50">$50 MXN</option>
+                    <option [ngValue]="100">$100 MXN</option>
+                    <option [ngValue]="200">$200 MXN</option>
+                    <option [ngValue]="500">$500 MXN</option>
+                  </select>
+                  <button type="button" class="folio-btn apple-pressable" (click)="importManualFolio()">
+                    Verificar
                   </button>
                 </div>
-
-                @if (bankHelperMode() === 'mint') {
-                  <p class="qb-desc">Adquiere al instante un ticket electrónico emitido por el Banco Central:</p>
-                  <div class="denom-pills">
-                    @for (amt of denominations; track amt) {
-                      <button
-                        type="button"
-                        class="denom-pill continuous apple-pressable"
-                        (click)="quickMintTicket(amt)"
-                      >
-                        <span>+{{ '$' + amt }}</span>
-                        <small>MXN</small>
-                      </button>
-                    }
-                  </div>
-                } @else {
-                  <p class="qb-desc">Ingresa el folio de seguridad de tu ticket de WalletPay:</p>
-                  <div class="folio-form">
-                    <input
-                      type="text"
-                      class="ios-input mono"
-                      placeholder="Ej. TKT-8420-A1B2"
-                      [(ngModel)]="manualFolio"
-                    />
-                    <select class="ios-select" [(ngModel)]="manualAmount">
-                      <option [ngValue]="50">$50 MXN</option>
-                      <option [ngValue]="100">$100 MXN</option>
-                      <option [ngValue]="200">$200 MXN</option>
-                      <option [ngValue]="500">$500 MXN</option>
-                    </select>
-                    <button type="button" class="folio-btn apple-pressable" (click)="importManualFolio()">
-                      Verificar
-                    </button>
-                  </div>
-                  @if (folioFeedback()) {
-                    <span class="folio-msg">{{ folioFeedback() }}</span>
-                  }
+                @if (folioFeedback()) {
+                  <span class="folio-msg">{{ folioFeedback() }}</span>
                 }
               </div>
             }

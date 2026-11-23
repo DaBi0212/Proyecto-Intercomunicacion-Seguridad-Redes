@@ -48,14 +48,6 @@ interface DenominationCard {
           >
             Canjeados ({{ market.usedTickets().length }})
           </button>
-          <button
-            type="button"
-            class="ios-segment-btn"
-            [class.active]="segment() === 'buy'"
-            (click)="setSegment('buy')"
-          >
-            + Adquirir Tickets
-          </button>
         </div>
       </header>
 
@@ -111,15 +103,10 @@ interface DenominationCard {
             <p>
               {{
                 segment() === 'active'
-                  ? 'Adquiere un ticket del Banco Central para realizar compras en el catálogo.'
+                  ? 'La compra de tickets se realiza exclusivamente desde la aplicación móvil WalletPay. Tus tickets adquiridos en WalletPay se sincronizan aquí automáticamente.'
                   : 'Los tickets que utilices como medio de pago aparecerán aquí con su sello de verificación.'
               }}
             </p>
-            @if (segment() === 'active') {
-              <button type="button" class="btn-buy continuous apple-pressable" (click)="setSegment('buy')">
-                Adquirir Tickets del Banco
-              </button>
-            }
           </div>
         } @else {
           <div class="passes-grid">
@@ -240,173 +227,6 @@ interface DenominationCard {
             }
           </div>
         }
-      }
-
-      <!-- VISTA 3: ADQUIRIR NUEVOS TICKETS DEL BANCO CENTRAL (1:1 CON WALLETPAY STOREPAGE) -->
-      @if (segment() === 'buy') {
-        <section class="custom-card-strip continuous">
-          <div class="ccs-head">
-            <div>
-              <strong>
-                {{
-                  market.savedUserCards().length > 0
-                    ? 'Tarjeta de Débito / Crédito vinculada a tu cuenta'
-                    : 'Vincula una Tarjeta de Débito / Crédito a tu cuenta'
-                }}
-              </strong>
-              <span>
-                {{
-                  market.savedUserCards().length > 0
-                    ? 'Tu número de cuenta permanece guardado en tu perfil para tus compras de tickets.'
-                    : 'Tu cuenta aún no tiene una tarjeta vinculada. Agrega una tarjeta para poder comprar tickets; quedará guardada en tu cuenta.'
-                }}
-              </span>
-            </div>
-            @if (market.savedUserCards().length > 0 && !addingNewCard()) {
-              <button type="button" class="btn-save-card continuous apple-pressable" (click)="addingNewCard.set(true)">
-                + Vincular otra tarjeta
-              </button>
-            }
-          </div>
-
-          @if (market.savedUserCards().length > 0) {
-            <div class="saved-cards-list">
-              @for (c of market.savedUserCards(); track c.id) {
-                <button
-                  type="button"
-                  class="saved-card-pill continuous apple-pressable"
-                  [class.selected]="activeCardId() === c.id"
-                  (click)="selectedCardId.set(c.id)"
-                >
-                  <span class="scp-icon" [style.background]="c.bg">
-                    <sf-symbol [name]="c.icon" [size]="15" />
-                  </span>
-                  <div class="scp-copy">
-                    <strong class="mono">{{ c.brand }} · {{ c.accountNumber }}</strong>
-                    <span>Cuenta: {{ c.accountNumber }} · Vence {{ c.expiry }} · CVC {{ c.cvc }}</span>
-                  </div>
-                  @if (activeCardId() === c.id) {
-                    <span class="scp-check">
-                      <sf-symbol name="checkmark" [size]="14" [weight]="2.6" />
-                    </span>
-                  }
-                </button>
-              }
-            </div>
-          }
-
-          @if (market.savedUserCards().length === 0 || addingNewCard()) {
-            <div class="ccs-inputs">
-              <label class="ccs-field">
-                <span>NÚMERO DE TARJETA / CUENTA</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  maxlength="19"
-                  class="mono"
-                  placeholder="4532 8910 2345 4821"
-                  [(ngModel)]="customCardNumber"
-                  (input)="formatCardNumber()"
-                />
-              </label>
-              <label class="ccs-field small">
-                <span>VENCIMIENTO (MM/AA)</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  maxlength="5"
-                  class="mono"
-                  placeholder="08/29"
-                  [(ngModel)]="customCardExpiry"
-                  (input)="formatCardExpiry()"
-                />
-              </label>
-              <label class="ccs-field small">
-                <span>CVC / CVV</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  maxlength="4"
-                  class="mono"
-                  placeholder="123"
-                  [(ngModel)]="customCardCvc"
-                  (input)="formatCardCvc()"
-                />
-              </label>
-              <div class="ccs-actions">
-                <button type="button" class="btn-save-card primary continuous apple-pressable" (click)="saveCardToAccount()">
-                  Guardar Tarjeta en mi Cuenta
-                </button>
-                @if (market.savedUserCards().length > 0) {
-                  <button type="button" class="btn-save-card continuous apple-pressable" (click)="addingNewCard.set(false)">
-                    Cancelar
-                  </button>
-                }
-              </div>
-            </div>
-          }
-          @if (cardFormError()) {
-            <span class="card-error-msg">{{ cardFormError() }}</span>
-          }
-        </section>
-
-        <div class="denominations-grid">
-          @for (d of denominations; track d.amount) {
-            <article
-              class="ticket-card continuous apple-pressable"
-              [class]="'ticket-card continuous apple-pressable ' + d.cls"
-              (click)="purchaseDenomination(d)"
-            >
-              <svg class="pass-watermark" viewBox="0 0 200 200" fill="none" aria-hidden="true">
-                <circle cx="150" cy="100" r="88" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 5" />
-                <circle cx="150" cy="100" r="64" stroke="currentColor" stroke-width="1.2" />
-                <circle cx="150" cy="100" r="40" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 4" />
-                <path d="M90 100h120M150 40v120" stroke="currentColor" stroke-width="0.8" />
-              </svg>
-
-              <span class="notch notch-left-sm" aria-hidden="true"></span>
-              <span class="notch notch-right-sm" aria-hidden="true"></span>
-
-              <div class="pass-head">
-                <div class="issuer">
-                  <span class="issuer-badge">
-                    <sf-symbol name="building.columns" [size]="14" [weight]="2.1" />
-                  </span>
-                  <div class="issuer-text">
-                    <strong>BANCO CENTRAL</strong>
-                    <span>CERTIFICADO DIGITAL · {{ d.tier | uppercase }}</span>
-                  </div>
-                </div>
-                <span class="status-pill" [class.gold-pill]="d.isTitanium">{{ d.badge }}</span>
-              </div>
-
-              <div class="pass-middle">
-                <div class="pass-price-block">
-                  <div class="pass-amount">
-                    <span class="cur">$</span>{{ d.amount }}<span class="dec">.00</span>
-                  </div>
-                  <span class="pass-label">MXN · Valor Fijo</span>
-                </div>
-                <div class="emv-chip" [class.gold-chip]="d.isTitanium">
-                  <span></span><span></span><span></span><span></span>
-                </div>
-              </div>
-
-              <div class="pass-perforation" aria-hidden="true"></div>
-
-              <div class="tc-bottom">
-                <div class="tc-meta">
-                  <span class="tc-desc">{{ d.desc }}</span>
-                  <span class="tc-serial mono">{{ d.code }}</span>
-                </div>
-                <div class="tc-cta" [class.gold-cta]="d.isTitanium">
-                  <span>Adquirir</span>
-                  <sf-symbol name="plus" [size]="14" [weight]="2.6" />
-                </div>
-              </div>
-            </article>
-          }
-        </div>
       }
     </div>
   `,
