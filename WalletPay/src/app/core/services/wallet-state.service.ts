@@ -380,6 +380,9 @@ export class WalletStateService {
       this.loadAccountCards(email, data.user?.savedCardsJson);
       if (data.user) {
         this.rememberLocalDeviceAccount(data.user);
+        if (data.user.savedCardsJson && data.user.savedCardsJson !== '[]' && this.savedUserCards().length === 0) {
+          this.loadAccountCards(this.currentUserEmail(), data.user.savedCardsJson);
+        }
       } else {
         this.rememberLocalDeviceAccount({
           id: `USR-${email.substring(0, 4).toUpperCase()}`,
@@ -440,6 +443,9 @@ export class WalletStateService {
 
       if (data.user) {
         this.rememberLocalDeviceAccount(data.user);
+        if (data.user.savedCardsJson && data.user.savedCardsJson !== '[]' && this.savedUserCards().length === 0) {
+          this.loadAccountCards(this.currentUserEmail(), data.user.savedCardsJson);
+        }
       }
 
       const revealedIds = new Set(
@@ -475,6 +481,7 @@ export class WalletStateService {
     this.tickets.set([]);
     this.ticketRequests.set([]);
     this.transactions.set([]);
+    this.savedUserCards.set([]);
     if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
     if (this.syncPollingTimer) clearInterval(this.syncPollingTimer);
     this.addAuditLog('warn', `[Seguridad] ${reason}.`);
