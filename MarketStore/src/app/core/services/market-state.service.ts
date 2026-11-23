@@ -822,6 +822,7 @@ export class MarketStateService {
     this.jwtToken = null;
     this.isAuthenticated.set(false);
     this.currentUser.set(null);
+    this.savedUserCards.set([]);
     this.tickets.set([]);
     this.orders.set([]);
     this.cart.set([]);
