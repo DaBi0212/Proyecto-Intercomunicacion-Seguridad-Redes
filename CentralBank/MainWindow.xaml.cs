@@ -103,15 +103,7 @@ public partial class MainWindow : Window
             });
         };
 
-        HeaderLanIpText.Text = $"Auto-Conexión Activa (0 Configuración Manual) · LAN: {CentralBankApiServer.GetLocalLanIp()}:{CentralBankApiServer.DefaultPort} · Conectando túnel HTTPS para Vercel y móviles...";
-        _apiServer.TunnelUrlPublished += httpsUrl =>
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                HeaderLanIpText.Text = $"Auto-Conexión Global Activa · Túnel HTTPS: {httpsUrl} · LAN: {CentralBankApiServer.GetLocalLanIp()}:{CentralBankApiServer.DefaultPort}";
-                _ = TriggerDynamicIslandHudAsync("Túnel HTTPS Público Activo · Conectado con Vercel y Móviles");
-            });
-        };
+        
 
         // Temporizador de sincronización continua con SQLite para reflejar cualquier cambio al instante
         _liveSyncTimer = new System.Windows.Threading.DispatcherTimer
