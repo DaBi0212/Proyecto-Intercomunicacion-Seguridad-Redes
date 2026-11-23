@@ -254,7 +254,9 @@ public sealed class SecureSession
 
 public sealed class SessionStore
 {
-    private static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(20);
+    // Las sesiones de WalletPay y MarketStore no caducan por inactividad: permanecen abiertas
+    // hasta que el usuario cierre sesión manualmente (solo se purgan canales abandonados por semanas).
+    private static readonly TimeSpan IdleTimeout = TimeSpan.FromDays(30);
     private readonly ConcurrentDictionary<string, SecureSession> _sessions = new();
 
     public SecureSession Create(byte[] key, string client)

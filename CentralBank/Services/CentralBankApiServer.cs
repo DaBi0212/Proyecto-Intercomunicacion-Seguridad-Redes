@@ -83,30 +83,75 @@ public class CentralBankApiServer : IDisposable
         _state = state;
     }
 
-    public void Start()
+    /// <summary>
+    /// true si esta ventana de CentralBank es la que atiende el puerto 7070 (nodo principal).
+    /// Las demás ventanas abiertas funcionan como consolas de administrador adicionales que comparten
+    /// la misma base SQLite y se actualizan en tiempo real.
+    /// </summary>
+    public bool IsRunning => _isRunning;
+
+    public bool Start(bool quiet = false)
     {
-        if (_isRunning) return;
+        if (_isRunning) return true;
+        var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
+        TcpListener? listener = null;
         try
         {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
-            File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Intentando abrir puerto {DefaultPort}...\n");
+            if (!quiet)
+            {
+                try { File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Intentando abrir puerto {DefaultPort}...\n"); } catch { }
+                TryOpenWindowsFirewallPort();
+            }
 
-            TryOpenWindowsFirewallPort();
-            _tcpListener = new TcpListener(IPAddress.Any, DefaultPort);
-            _tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-            _tcpListener.Start();
+            listener = new TcpListener(IPAddress.Any, DefaultPort);
+            // Uso exclusivo del puerto: evita que dos consolas abiertas atiendan el mismo puerto a la vez.
+            listener.ExclusiveAddressUse = true;
+            listener.Start();
+            _tcpListener = listener;
             _isRunning = true;
 
-            File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Puerto {DefaultPort} ABIERTO Y ESCUCHANDO EXITOSAMENTE.\n");
+            try { File.AppendAllText(logPath, $"[APISERVER START {DateTime.Now}] Puerto {DefaultPort} ABIERTO Y ESCUCHANDO EXITOSAMENTE.\n"); } catch { }
+            if (quiet)
+            {
+                _state.AddAuditLog("NET", "#34C759", $"[Multi-Administrador] Esta consola tomó el control del servidor API :{DefaultPort} (la consola principal anterior se cerró).");
+            }
 
             _ = Task.Run(() => AcceptClientsLoopAsync(_cts.Token));
             _ = Task.Run(() => StartAutomaticPublicTunnelAndDiscoveryAsync(_cts.Token));
+            return true;
+        }
+        catch (SocketException) when (IsPortServedByAnotherConsole())
+        {
+            try { listener?.Stop(); } catch { }
+            if (!quiet)
+            {
+                _state.AddAuditLog("NET", "#007AFF", $"[Multi-Administrador] Consola de administrador adicional conectada. El servidor API :{DefaultPort} ya lo atiende otra consola de CentralBank; esta ventana comparte la misma base SQLite en tiempo real.");
+            }
+            return false;
         }
         catch (Exception ex)
         {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "centralbank_crash.log");
-            File.AppendAllText(logPath, $"[APISERVER START ERROR {DateTime.Now}] {ex}\n");
-            _state.AddAuditLog("WARN", "#FF9500", $"[Servidor API] No se pudo iniciar en puerto {DefaultPort}: {ex.Message}");
+            try { listener?.Stop(); } catch { }
+            if (!quiet)
+            {
+                try { File.AppendAllText(logPath, $"[APISERVER START ERROR {DateTime.Now}] {ex}\n"); } catch { }
+                _state.AddAuditLog("WARN", "#FF9500", $"[Servidor API] No se pudo iniciar en puerto {DefaultPort}: {ex.Message}");
+            }
+            return false;
+        }
+    }
+
+    private static bool IsPortServedByAnotherConsole()
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var connectTask = client.ConnectAsync(IPAddress.Loopback, DefaultPort);
+            return connectTask.Wait(800) && client.Connected;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -866,8 +911,20 @@ public class CentralBankApiServer : IDisposable
                 if (!session.IsAuthenticated || session.UserEmail == null)
                     return (401, new { ok = false, code = "UNAUTHORIZED", error = "Inicia sesión para adquirir tickets." });
 
+                // La compra de tickets se realiza exclusivamente desde la app móvil WalletPay.
+                if (!string.Equals(session.Client, "WalletPay", StringComparison.OrdinalIgnoreCase))
+                {
+                    _state.AddAuditLog("SEC", "#FF9500", $"[Emisión] Intento de compra de ticket desde {session.Client} bloqueado para {session.UserEmail}. Solo se permite desde WalletPay.");
+                    return (403, new
+                    {
+                        ok = false,
+                        code = "WALLETPAY_ONLY",
+                        error = "Los tickets solo pueden comprarse desde la app WalletPay."
+                    });
+                }
+
                 var amount = GetIntProp(payload, "amount", 0);
-                var paymentMethod = GetStringProp(payload, "paymentMethod", "Tarjeta de Débito/Crédito Visa •••• 4821");
+                var paymentMethod = GetStringProp(payload, "paymentMethod", "Tarjeta de Débito/Crédito");
 
                 if (!CentralBankStateService.AllowedDenominations.Contains(amount))
                 {
@@ -1091,12 +1148,31 @@ public class CentralBankApiServer : IDisposable
                     return (200, new { ok = false, code, error = msg });
                 }
 
+                // Validación AUTOMÁTICA: el banco verifica la autenticidad, titularidad y no-doble-gasto de cada
+                // ticket y liquida la compra sin intervención del Administrador.
+                var (approved, approveMsg) = _state.ApprovePendingOrder(orderRec.OrderId);
+                _state.ReloadFromDatabase();
+                var finalOrder = _state.Orders.FirstOrDefault(o => o.OrderId == orderRec.OrderId) ?? orderRec;
+
+                if (!approved)
+                {
+                    return (200, new
+                    {
+                        ok = false,
+                        code = "ORDER_REJECTED",
+                        orderId = finalOrder.OrderId,
+                        approvalStatus = finalOrder.ApprovalStatus,
+                        error = string.IsNullOrWhiteSpace(finalOrder.VerificationReport) ? approveMsg : finalOrder.VerificationReport
+                    });
+                }
+
                 return (200, new
                 {
                     ok = true,
-                    orderId = orderRec.OrderId,
-                    approvalStatus = orderRec.ApprovalStatus,
-                    message = msg
+                    orderId = finalOrder.OrderId,
+                    approvalStatus = finalOrder.ApprovalStatus,
+                    bankVerificationCode = finalOrder.BankVerificationCode,
+                    message = "Compra verificada y aprobada automáticamente por el Banco Central."
                 });
             }
 
