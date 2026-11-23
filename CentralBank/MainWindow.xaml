@@ -48,9 +48,6 @@
                                        Margin="0,0,10,0"
                                        VerticalAlignment="Center"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
-                                <Border Background="{DynamicResource SoftGreen}" CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
-                                    <TextBlock Text="SQLITE + API :7070 ACTIVA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
-                                </Border>
                             </StackPanel>
                             <TextBlock x:Name="HeaderLanIpText"
                                        Text="Conectado en tiempo real en red local (0.0.0.0:7070) con WalletPay APK y MarketStore Vercel"
