@@ -797,6 +797,24 @@ public class CentralBankStateService
     public BankUser SetUserRole(string email, string role, string? storeName) =>
         EnsureUserExists(email, null, null, null, role, string.IsNullOrWhiteSpace(storeName) ? null : storeName);
 
+    public string UpdateUserSavedCards(string email, string cardsJson)
+    {
+        var cleanEmail = (email ?? "").Trim().ToLowerInvariant();
+        var safeJson = string.IsNullOrWhiteSpace(cardsJson) ? "[]" : cardsJson.Trim();
+        lock (_dbLock)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE users SET saved_cards_json = $cards WHERE LOWER(email) = $email;";
+            cmd.Parameters.AddWithValue("$cards", safeJson);
+            cmd.Parameters.AddWithValue("$email", cleanEmail);
+            cmd.ExecuteNonQuery();
+        }
+        ReloadFromDatabase();
+        return FindUser(cleanEmail)?.SavedCardsJson ?? "[]";
+    }
+
     // ---------------- Administrador de la consola ----------------
 
     private string? GetConfig(string key)

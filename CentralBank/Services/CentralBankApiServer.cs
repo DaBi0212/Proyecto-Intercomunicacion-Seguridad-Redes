@@ -794,6 +794,26 @@ public class CentralBankApiServer : IDisposable
                 return (200, new { ok = true });
             }
 
+            case "user.cards.save":
+            {
+                if (!session.IsAuthenticated || session.UserEmail == null)
+                    return (401, new { ok = false, code = "UNAUTHORIZED", error = "Inicia sesión para guardar tu tarjeta." });
+
+                var cardsJson = "[]";
+                if (payload.TryGetProperty("cards", out var cardsEl))
+                {
+                    cardsJson = cardsEl.GetRawText();
+                }
+                else
+                {
+                    cardsJson = GetStringProp(payload, "cardsJson", "[]");
+                }
+
+                var updatedJson = _state.UpdateUserSavedCards(session.UserEmail, cardsJson);
+                _state.AddAuditLog("CARD", "#007AFF", $"[Tarjeta Vinculada] El usuario {session.UserEmail} actualizó sus tarjetas vinculadas en su cuenta.");
+                return (200, new { ok = true, savedCardsJson = updatedJson });
+            }
+
             case "state.sync":
             {
                 if (!session.IsAuthenticated || session.UserEmail == null)
@@ -1165,6 +1185,7 @@ public class CentralBankApiServer : IDisposable
         avatarInitials = u.AvatarInitials,
         avatarHex = u.AvatarHex,
         storeCredit = u.StoreCredit,
+        savedCardsJson = string.IsNullOrWhiteSpace(u.SavedCardsJson) ? "[]" : u.SavedCardsJson,
         unusedTicketsCount = u.UnusedTicketsCount,
         unusedBalance = u.UnusedBalance,
         usedTicketsCount = u.UsedTicketsCount,
