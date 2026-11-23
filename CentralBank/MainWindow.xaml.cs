@@ -227,14 +227,14 @@ public partial class MainWindow : Window
             ? "Verificados y aprobados en MarketStore"
             : $"{_state.RedemptionRatePercent:F1}% ya usados en MarketStore · 0 doble gasto";
 
-        KpiUsersAndTxValue.Text = $"{_state.Users.Count} Usuarios · {totalPending} Pendientes";
-        KpiUsersAndTxSub.Text = $"{pendingTicketReqs} tarjetas por aprobar · {pendingOrders} compras tienda";
+        KpiUsersAndTxValue.Text = $"{_state.Users.Count} Usuarios · {pendingTicketReqs} Pendientes";
+        KpiUsersAndTxSub.Text = $"{pendingTicketReqs} tarjeta(s) por aprobar · {_state.Orders.Count} compras auto-validadas";
 
-        // Actualizar banner de alerta superior cuando hay pagos de tickets o compras de MarketStore esperando aprobación
-        if (totalPending > 0)
+        // Actualizar banner de alerta superior cuando hay pagos de tickets en WalletPay esperando aprobación
+        if (pendingTicketReqs > 0)
         {
             LivePendingOrdersAlertBanner.Visibility = Visibility.Visible;
-            LivePendingAlertTitle.Text = $"Hay {totalPending} operación(es) pendientes ({pendingTicketReqs} compra(s) de ticket y {pendingOrders} orden(es) de MarketStore)";
+            LivePendingAlertTitle.Text = $"Hay {pendingTicketReqs} solicitud(es) de compra de ticket en WalletPay esperando aprobación del Administrador";
         }
         else
         {
@@ -243,9 +243,9 @@ public partial class MainWindow : Window
 
         // Actualizar textos de pestañas
         TabBtnTransactions.Content = $"Historial de Transacciones ({_state.Transactions.Count})";
-        TabBtnApprovals.Content = totalPending > 0
-            ? $"Aprobar Tarjetas y Compras ({totalPending} Pend.)"
-            : $"Aprobar Tarjetas y Compras ({_state.TicketRequests.Count + _state.Orders.Count})";
+        TabBtnApprovals.Content = pendingTicketReqs > 0
+            ? $"Aprobar Compra de Tickets ({pendingTicketReqs} Pend.)"
+            : $"Aprobar Compra de Tickets ({_state.TicketRequests.Count})";
         TabBtnTickets.Content = $"Tickets ({unusedCount} Sin Usar · {usedCount} Usados)";
 
         RebuildUserFilterPills();

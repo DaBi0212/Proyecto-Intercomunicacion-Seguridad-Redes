@@ -105,7 +105,7 @@
                             <Button x:Name="TabBtnApprovals"
                                     Style="{StaticResource IosSegmentBtn}"
                                     Click="OnMainTabApprovalsClick"
-                                    Content="Aprobar Compras Tienda (0)" />
+                                    Content="Aprobar Compra de Tickets (0)" />
                             <Button x:Name="TabBtnTickets"
                                     Style="{StaticResource IosSegmentBtn}"
                                     Click="OnMainTabTicketsClick"
@@ -144,17 +144,17 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="SOLICITUD DE COMPRA EN TIEMPO REAL DESDE MARKETSTORE"
+                                <TextBlock Text="SOLICITUD DE COMPRA DE TICKET EN TIEMPO REAL DESDE WALLETPAY"
                                            FontSize="10.5"
                                            FontWeight="Bold"
                                            Foreground="#D97706" />
                                 <TextBlock x:Name="LivePendingAlertTitle"
-                                           Text="Hay 1 compra pendiente de verificación de tickets y aprobación bancaria"
+                                           Text="Hay 1 solicitud de compra de ticket pendiente de aprobación bancaria"
                                            FontSize="17"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimary}"
                                            Margin="0,2,0,2" />
-                                <TextBlock Text="Verifica la autenticidad de los tickets presentados por el cliente y aprueba la orden para liberar su compra en MarketStore."
+                                <TextBlock Text="Valida los datos de la tarjeta de débito o crédito del usuario y aprueba o rechaza la compra del ticket en WalletPay."
                                            FontSize="12.5"
                                            Foreground="{DynamicResource TextSecondary}" />
                             </StackPanel>
@@ -162,7 +162,7 @@
                                     Style="{StaticResource ApplePrimaryBtn}"
                                     Background="#EA580C"
                                     Click="OnMainTabApprovalsClick"
-                                    Content="Revisar, Verificar Tickets y Aprobar Compra"
+                                    Content="Revisar y Aprobar Compra de Ticket"
                                     VerticalAlignment="Center" />
                         </Grid>
                     </Border>

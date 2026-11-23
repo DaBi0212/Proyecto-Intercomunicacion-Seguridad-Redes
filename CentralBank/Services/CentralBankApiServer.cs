@@ -1171,6 +1171,9 @@ public class CentralBankApiServer : IDisposable
                     orderId = finalOrder.OrderId,
                     approvalStatus = finalOrder.ApprovalStatus,
                     bankVerificationCode = finalOrder.BankVerificationCode,
+                    changeCredited = finalOrder.ChangeCredited,
+                    order = MapOrderForMarketStore(finalOrder),
+                    receipt = _state.BuildOrderReceipt(finalOrder),
                     message = "Compra verificada y aprobada automáticamente por el Banco Central."
                 });
             }
