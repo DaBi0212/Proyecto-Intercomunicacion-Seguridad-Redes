@@ -1185,11 +1185,32 @@ public class CentralBankStateService
             if (req.IsApproved)
             {
                 var existingTk = Tickets.FirstOrDefault(t => t.Id == req.MintedTicketId);
-                return (true, "La solicitud ya había sido aprobada.", existingTk);
+                return (false, "Otro administrador ya aprobó esta solicitud.", existingTk);
             }
-            if (req.IsRejected) return (false, "La solicitud ya había sido rechazada.", null);
+            if (req.IsRejected) return (false, "Otro administrador ya rechazó esta solicitud.", null);
 
-            var minted = PurchaseTicketForUser(req.UserEmail, req.Amount, req.PaymentMethod);
+            // Reclamo atómico en SQLite: si varias consolas de administrador pulsan "Aprobar" al mismo tiempo,
+            // solo una obtiene la solicitud; las demás reciben el aviso de que ya fue procesada.
+            if (!TryClaimTicketRequest(req.RequestId))
+            {
+                ReloadFromDatabase();
+                var current = TicketRequests.FirstOrDefault(r => r.RequestId == req.RequestId);
+                return (false, current?.IsRejected == true
+                    ? "Otro administrador ya rechazó esta solicitud."
+                    : "Otro administrador ya está procesando o aprobó esta solicitud.", null);
+            }
+
+            BankTicketRecord minted;
+            try
+            {
+                minted = PurchaseTicketForUser(req.UserEmail, req.Amount, req.PaymentMethod);
+            }
+            catch (Exception ex)
+            {
+                ReleaseTicketRequestClaim(req.RequestId);
+                return (false, $"No se pudo emitir el ticket: {ex.Message}", null);
+            }
+
             var authCode = $"CARD-OK-{SecurityService.NewInt(10000, 100000)}";
             var report = $"Pago con tarjeta ({req.PaymentMethod}) validado y aprobado por el Administrador ({authCode}). Ticket {minted.Id} emitido.";
 
@@ -1204,7 +1225,7 @@ public class CentralBankStateService
                         minted_ticket_id = $tid,
                         bank_auth_code = $code,
                         status_report = $rep
-                    WHERE request_id = $rid;";
+                    WHERE request_id = $rid AND approval_status = 'processing';";
                 cmd.Parameters.AddWithValue("$tid", minted.Id);
                 cmd.Parameters.AddWithValue("$code", authCode);
                 cmd.Parameters.AddWithValue("$rep", report);
@@ -1224,8 +1245,36 @@ public class CentralBankStateService
         }
     }
 
-    public void RejectTicketPurchaseRequest(string requestId, string reason = "Pago con tarjeta rechazado por el Administrador del Banco Central.")
+    private bool TryClaimTicketRequest(string requestId)
     {
+        lock (_dbLock)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE ticket_requests SET approval_status = 'processing' WHERE request_id = $rid AND approval_status = 'pending';";
+            cmd.Parameters.AddWithValue("$rid", requestId);
+            return cmd.ExecuteNonQuery() == 1;
+        }
+    }
+
+    private void ReleaseTicketRequestClaim(string requestId)
+    {
+        lock (_dbLock)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE ticket_requests SET approval_status = 'pending' WHERE request_id = $rid AND approval_status = 'processing';";
+            cmd.Parameters.AddWithValue("$rid", requestId);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>Rechaza la solicitud solo si sigue pendiente. Devuelve false si otro administrador ya la procesó.</summary>
+    public bool RejectTicketPurchaseRequest(string requestId, string reason = "Pago con tarjeta rechazado por el Administrador del Banco Central.")
+    {
+        int affected;
         lock (_dbLock)
         {
             using var conn = new SqliteConnection(_connectionString);
@@ -1239,12 +1288,19 @@ public class CentralBankStateService
                 WHERE request_id = $rid AND approval_status = 'pending';";
             cmd.Parameters.AddWithValue("$rep", reason);
             cmd.Parameters.AddWithValue("$rid", requestId);
-            cmd.ExecuteNonQuery();
+            affected = cmd.ExecuteNonQuery();
+        }
+
+        if (affected != 1)
+        {
+            ReloadFromDatabase();
+            return false;
         }
 
         AddAuditLog("CARD-REJ", "#FF3B30", $"[Pago de Tarjeta Rechazado] Solicitud #{requestId} denegada por el Administrador: {reason}");
         ReloadFromDatabase();
         NotifyStateChanged($"Solicitud de compra de ticket #{requestId} rechazada");
+        return true;
     }
 
     // =========================================================================
@@ -1493,7 +1549,7 @@ public class CentralBankStateService
                     $cdate, $ctime, $sub, $tktotal, $credit, $change,
                     $isum, $ijson, $tkcsv, $tkjson,
                     'pending', 0, 0,
-                    'Solicitud recibida desde MarketStore. Tickets validados en la recepción; esperando revisión y aprobación del Administrador.',
+                    'Solicitud recibida desde MarketStore. Verificando automáticamente la autenticidad de los tickets con el Banco Central...',
                     'PENDIENTE', 'verified', $epoch, $isig, ''
                 );";
             cmd.Parameters.AddWithValue("$oid", orderId);
@@ -1519,14 +1575,12 @@ public class CentralBankStateService
         AddAuditLog(
             "REQ",
             "#FF9500",
-            $"[MarketStore -> Banco] Solicitud de compra #{orderId} de {user.Name} por ${subtotal:N2} MXN con tickets [{ticketIdsCsv}]. Esperando aprobación."
+            $"[MarketStore -> Banco] Solicitud de compra #{orderId} de {user.Name} por ${subtotal:N2} MXN con tickets [{ticketIdsCsv}]. Validación automática en curso."
         );
 
         ReloadFromDatabase();
         var record = Orders.First(o => o.OrderId == orderId);
-        PendingOrderCreated?.Invoke(record);
-        NotifyStateChanged($"¡Nueva solicitud de compra #{orderId} en MarketStore espera aprobación!");
-        return (true, "Solicitud enviada al Banco Central.", OrderRejection.None, record);
+        return (true, "Solicitud recibida por el Banco Central.", OrderRejection.None, record);
     }
 
     /// <summary>
@@ -1750,7 +1804,7 @@ public class CentralBankStateService
                                 bank_verification_code = $code,
                                 receipt_sig = $rsig
                             WHERE order_id = $oid AND approval_status = 'pending';";
-                        cmd.Parameters.AddWithValue("$rep", $"Aprobada por el Administrador del Banco Central ({authCode}). Tickets liquidados.");
+                        cmd.Parameters.AddWithValue("$rep", $"Aprobada automáticamente por el Banco Central ({authCode}): tickets auténticos, del titular y sin uso previo. Tickets liquidados.");
                         cmd.Parameters.AddWithValue("$code", authCode);
                         cmd.Parameters.AddWithValue("$rsig", receiptSig);
                         cmd.Parameters.AddWithValue("$oid", orderId);
@@ -1786,7 +1840,7 @@ public class CentralBankStateService
             AddAuditLog(
                 "APPROVE",
                 "#34C759",
-                $"[Compra Aprobada] Orden #{orderId} de {order!.BuyerName} por ${order.Subtotal:N2} MXN autorizada con sello {authCode}. Tickets marcados como YA USADOS."
+                $"[Compra Aprobada Automáticamente] Orden #{orderId} de {order!.BuyerName} por ${order.Subtotal:N2} MXN validada por el Banco Central con sello {authCode}. Tickets marcados como YA USADOS."
             );
 
             ReloadFromDatabase();
