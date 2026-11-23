@@ -46,29 +46,37 @@
                                     Background="{DynamicResource BgCardElevated}"
                                     BorderBrush="{DynamicResource IosSeparator}"
                                     BorderThickness="1"
-                                    Padding="8,5"
+                                    Padding="7,4"
                                     Margin="0,0,12,0"
                                     VerticalAlignment="Center">
-                                <Image Source="pack://application:,,,/Assets/centralbank-vertical.png"
-                                       Height="34"
+                                <Image Source="pack://application:,,,/Assets/centralbank-mark.png"
+                                       Width="30"
+                                       Height="30"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Image Source="pack://application:,,,/Assets/centralbank-horizontal.png"
-                                           Height="22"
-                                           Margin="0,0,8,0"
+                                           Height="23"
+                                           Margin="0,0,9,0"
                                            VerticalAlignment="Center"
                                            RenderOptions.BitmapScalingMode="HighQuality" />
                                     <Border Background="{DynamicResource SoftGreen}" CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
                                         <TextBlock Text="SQLITE + API :7070 ACTIVA" FontSize="10" FontWeight="Bold" Foreground="#28B44B" />
                                     </Border>
                                 </StackPanel>
-                                <TextBlock x:Name="HeaderLanIpText"
-                                           Text="Conectado en tiempo real en red local (0.0.0.0:7070) con WalletPay APK y MarketStore Vercel"
-                                           FontSize="11.5"
-                                           Margin="0,2,0,0"
-                                           Foreground="{DynamicResource TextSecondary}" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,0,0">
+                                    <Image Source="pack://application:,,,/Assets/centralbank-vertical.png"
+                                           Height="17"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <TextBlock x:Name="HeaderLanIpText"
+                                               Text="Conectado en tiempo real en red local (0.0.0.0:7070) con WalletPay APK y MarketStore Vercel"
+                                               FontSize="11.5"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondary}" />
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
 
