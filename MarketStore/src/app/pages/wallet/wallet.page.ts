@@ -247,48 +247,107 @@ interface DenominationCard {
         <section class="custom-card-strip continuous">
           <div class="ccs-head">
             <div>
-              <strong>Datos de tu Tarjeta de Débito / Crédito</strong>
-              <span>Estos datos pueden ser simulados. El Administrador de CentralBank verificará y aprobará o rechazará la compra.</span>
+              <strong>
+                {{
+                  market.savedUserCards().length > 0
+                    ? 'Tarjeta de Débito / Crédito vinculada a tu cuenta'
+                    : 'Vincula una Tarjeta de Débito / Crédito a tu cuenta'
+                }}
+              </strong>
+              <span>
+                {{
+                  market.savedUserCards().length > 0
+                    ? 'Tu número de cuenta permanece guardado en tu perfil para tus compras de tickets.'
+                    : 'Tu cuenta aún no tiene una tarjeta vinculada. Agrega una tarjeta para poder comprar tickets; quedará guardada en tu cuenta.'
+                }}
+              </span>
             </div>
+            @if (market.savedUserCards().length > 0 && !addingNewCard()) {
+              <button type="button" class="btn-save-card continuous apple-pressable" (click)="addingNewCard.set(true)">
+                + Vincular otra tarjeta
+              </button>
+            }
           </div>
-          <div class="ccs-inputs">
-            <label class="ccs-field">
-              <span>NÚMERO DE TARJETA / CUENTA</span>
-              <input
-                type="text"
-                inputmode="numeric"
-                maxlength="19"
-                class="mono"
-                placeholder="4532 •••• •••• 4821"
-                [(ngModel)]="customCardNumber"
-                (input)="formatCardNumber()"
-              />
-            </label>
-            <label class="ccs-field small">
-              <span>VENCIMIENTO (MM/AA)</span>
-              <input
-                type="text"
-                inputmode="numeric"
-                maxlength="5"
-                class="mono"
-                placeholder="08/29"
-                [(ngModel)]="customCardExpiry"
-                (input)="formatCardExpiry()"
-              />
-            </label>
-            <label class="ccs-field small">
-              <span>CVC / CVV</span>
-              <input
-                type="text"
-                inputmode="numeric"
-                maxlength="4"
-                class="mono"
-                placeholder="123"
-                [(ngModel)]="customCardCvc"
-                (input)="formatCardCvc()"
-              />
-            </label>
-          </div>
+
+          @if (market.savedUserCards().length > 0) {
+            <div class="saved-cards-list">
+              @for (c of market.savedUserCards(); track c.id) {
+                <button
+                  type="button"
+                  class="saved-card-pill continuous apple-pressable"
+                  [class.selected]="activeCardId() === c.id"
+                  (click)="selectedCardId.set(c.id)"
+                >
+                  <span class="scp-icon" [style.background]="c.bg">
+                    <sf-symbol [name]="c.icon" [size]="15" />
+                  </span>
+                  <div class="scp-copy">
+                    <strong class="mono">{{ c.brand }} · {{ c.accountNumber }}</strong>
+                    <span>Cuenta: {{ c.accountNumber }} · Vence {{ c.expiry }} · CVC {{ c.cvc }}</span>
+                  </div>
+                  @if (activeCardId() === c.id) {
+                    <span class="scp-check">
+                      <sf-symbol name="checkmark" [size]="14" [weight]="2.6" />
+                    </span>
+                  }
+                </button>
+              }
+            </div>
+          }
+
+          @if (market.savedUserCards().length === 0 || addingNewCard()) {
+            <div class="ccs-inputs">
+              <label class="ccs-field">
+                <span>NÚMERO DE TARJETA / CUENTA</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="19"
+                  class="mono"
+                  placeholder="4532 8910 2345 4821"
+                  [(ngModel)]="customCardNumber"
+                  (input)="formatCardNumber()"
+                />
+              </label>
+              <label class="ccs-field small">
+                <span>VENCIMIENTO (MM/AA)</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="5"
+                  class="mono"
+                  placeholder="08/29"
+                  [(ngModel)]="customCardExpiry"
+                  (input)="formatCardExpiry()"
+                />
+              </label>
+              <label class="ccs-field small">
+                <span>CVC / CVV</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="4"
+                  class="mono"
+                  placeholder="123"
+                  [(ngModel)]="customCardCvc"
+                  (input)="formatCardCvc()"
+                />
+              </label>
+              <div class="ccs-actions">
+                <button type="button" class="btn-save-card primary continuous apple-pressable" (click)="saveCardToAccount()">
+                  Guardar Tarjeta en mi Cuenta
+                </button>
+                @if (market.savedUserCards().length > 0) {
+                  <button type="button" class="btn-save-card continuous apple-pressable" (click)="addingNewCard.set(false)">
+                    Cancelar
+                  </button>
+                }
+              </div>
+            </div>
+          }
+          @if (cardFormError()) {
+            <span class="card-error-msg">{{ cardFormError() }}</span>
+          }
         </section>
 
         <div class="denominations-grid">
@@ -845,6 +904,13 @@ interface DenominationCard {
       flex-direction: column;
       gap: 12px;
     }
+    .ccs-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
     .ccs-head div {
       display: flex;
       flex-direction: column;
@@ -857,6 +923,83 @@ interface DenominationCard {
     .ccs-head span {
       font-size: 12.5px;
       color: var(--ios-label-2);
+    }
+    .saved-cards-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .saved-card-pill {
+      --r: 14px;
+      border: 1px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      text-align: left;
+      flex: 1;
+      min-width: 260px;
+    }
+    .saved-card-pill.selected {
+      border-color: var(--ion-color-primary);
+      box-shadow: 0 0 0 1px var(--ion-color-primary);
+    }
+    .scp-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .scp-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    .scp-copy strong {
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+    .scp-copy span {
+      font-size: 11.5px;
+      color: var(--ios-label-2);
+    }
+    .scp-check {
+      color: var(--ion-color-primary);
+      display: flex;
+      align-items: center;
+    }
+    .ccs-actions {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .btn-save-card {
+      --r: 11px;
+      height: 40px;
+      padding: 0 14px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .btn-save-card.primary {
+      border: 0;
+      background: var(--ion-color-primary);
+      color: #fff;
+    }
+    .card-error-msg {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #FF3B30;
     }
     .ccs-inputs {
       display: flex;
@@ -903,21 +1046,90 @@ export class WalletPage {
   customCardNumber = '';
   customCardExpiry = '';
   customCardCvc = '';
+  readonly addingNewCard = signal<boolean>(false);
+  readonly selectedCardId = signal<string>('');
+  readonly cardFormError = signal<string>('');
   readonly importFeedback = signal<string>('');
   private qrSvgCache = new Map<string, { viewBox: string; path: string; size: number }>();
+
+  readonly activeCardId = computed<string>(() => {
+    const cards = this.market.savedUserCards();
+    const sel = this.selectedCardId();
+    if (sel && cards.some((c) => c.id === sel)) return sel;
+    return cards.length > 0 ? cards[0].id : '';
+  });
 
   formatCardNumber(): void {
     const digits = this.customCardNumber.replace(/\D/g, '').substring(0, 16);
     this.customCardNumber = (digits.match(/.{1,4}/g) || []).join(' ');
+    if (this.cardFormError()) this.cardFormError.set('');
   }
 
   formatCardExpiry(): void {
     const digits = this.customCardExpiry.replace(/\D/g, '').substring(0, 4);
     this.customCardExpiry = digits.length >= 3 ? `${digits.substring(0, 2)}/${digits.substring(2)}` : digits;
+    if (this.cardFormError()) this.cardFormError.set('');
   }
 
   formatCardCvc(): void {
     this.customCardCvc = this.customCardCvc.replace(/\D/g, '').substring(0, 4);
+    if (this.cardFormError()) this.cardFormError.set('');
+  }
+
+  private detectCardBrand(digits: string): { name: string; icon: string; bg: string } {
+    if (digits.startsWith('4')) {
+      return { name: 'Tarjeta Visa', icon: 'creditcard', bg: '#111111' };
+    }
+    if (digits.startsWith('5') || digits.startsWith('2')) {
+      return { name: 'Tarjeta Mastercard', icon: 'creditcard.fill', bg: '#FF5E3A' };
+    }
+    if (digits.startsWith('3')) {
+      return { name: 'American Express', icon: 'creditcard.fill', bg: '#007AFF' };
+    }
+    return { name: 'Tarjeta Débito/Crédito', icon: 'creditcard.fill', bg: '#5856D6' };
+  }
+
+  async saveCardToAccount(): Promise<SavedUserCard | null> {
+    const digits = this.customCardNumber.replace(/\D/g, '');
+    if (digits.length < 12) {
+      this.cardFormError.set('Ingresa un número de cuenta o tarjeta válido (12 a 16 dígitos).');
+      return null;
+    }
+    const exp = this.customCardExpiry.trim();
+    if (exp.length < 4) {
+      this.cardFormError.set('Ingresa la fecha de vencimiento (MM/AA).');
+      return null;
+    }
+    const cvc = this.customCardCvc.trim();
+    if (cvc.length < 3) {
+      this.cardFormError.set('Ingresa el código de seguridad CVC / CVV.');
+      return null;
+    }
+
+    const last4 = digits.slice(-4);
+    const formattedNum = (digits.match(/.{1,4}/g) || [digits]).join(' ');
+    const brand = this.detectCardBrand(digits);
+    const cardId = `user_card_${digits}`;
+    const newCard: SavedUserCard = {
+      id: cardId,
+      accountNumber: formattedNum,
+      last4,
+      expiry: exp,
+      cvc,
+      brand: brand.name,
+      holderName: this.market.currentUser()?.name || 'Titular',
+      icon: brand.icon,
+      bg: brand.bg
+    };
+
+    await this.market.addOrUpdateUserCard(newCard);
+    this.selectedCardId.set(cardId);
+    this.addingNewCard.set(false);
+    this.cardFormError.set('');
+    this.customCardNumber = '';
+    this.customCardExpiry = '';
+    this.customCardCvc = '';
+    return newCard;
   }
 
   getQrSvgForTicket(t: BankTicket): { viewBox: string; path: string; size: number } {
@@ -990,13 +1202,26 @@ export class WalletPage {
 
   async purchaseDenomination(d: DenominationCard): Promise<void> {
     try {
-      const digits = this.customCardNumber.replace(/\D/g, '');
-      const exp = this.customCardExpiry.trim() || '08/29';
-      const cvc = this.customCardCvc.trim() || '482';
-      const methodLabel =
-        digits.length >= 12
-          ? `Tarjeta Débito/Crédito (${this.customCardNumber.trim()} · Vence ${exp} · CVC ${cvc})`
-          : 'Tarjeta Visa •••• 4821 (MarketStore)';
+      let chosenCard = this.market
+        .savedUserCards()
+        .find((c) => c.id === this.activeCardId());
+
+      if (!chosenCard) {
+        const digits = this.customCardNumber.replace(/\D/g, '');
+        if (digits.length >= 12) {
+          const saved = await this.saveCardToAccount();
+          if (!saved) return;
+          chosenCard = saved;
+        } else {
+          this.addingNewCard.set(true);
+          this.cardFormError.set(
+            'Tu cuenta no tiene una tarjeta vinculada. Ingresa y guarda tu tarjeta de débito o crédito primero.'
+          );
+          return;
+        }
+      }
+
+      const methodLabel = `${chosenCard.brand} (${chosenCard.accountNumber} · Vence ${chosenCard.expiry} · CVC ${chosenCard.cvc})`;
 
       this.importFeedback.set(
         `Solicitando Ticket $${d.amount} MXN con ${methodLabel} · Esperando aprobación en CentralBank Desktop...`
