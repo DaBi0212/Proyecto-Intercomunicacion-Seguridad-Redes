@@ -99,8 +99,8 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
                 <sf-symbol name="checkmark.seal.fill" [size]="18" />
               </span>
               <div>
-                <strong>3. Aprobación en CentralBank Desktop</strong>
-                <span>El Administrador verifica la autenticidad de tus tickets y aprueba la compra.</span>
+                <strong>3. Validación Automática con CentralBank</strong>
+                <span>El Banco Central verifica automáticamente la validez de tus tickets al comprar.</span>
               </div>
             </div>
           </div>
