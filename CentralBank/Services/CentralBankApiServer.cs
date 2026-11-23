@@ -782,8 +782,7 @@ public class CentralBankApiServer : IDisposable
 
                 session.UserEmail = user.Email;
                 session.Role = user.Role;
-                var nextToken = _state.IssueDeviceToken(user.Email);
-                return (200, BuildAuthenticatedBundle(user, nextToken));
+                return (200, BuildAuthenticatedBundle(user, deviceToken));
             }
 
             case "auth.handoff.create":

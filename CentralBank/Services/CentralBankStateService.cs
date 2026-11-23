@@ -755,7 +755,7 @@ public class CentralBankStateService
         }
     }
 
-    /// <summary>Emite un token de acceso rápido (desbloqueo biométrico) ligado al dispositivo. Solo se guarda su hash.</summary>
+    /// <summary>Emite un token de acceso rápido (desbloqueo biométrico y sesión persistente) ligado al dispositivo. Solo se guarda su hash.</summary>
     public string IssueDeviceToken(string email)
     {
         var token = SecurityService.NewToken(32);
@@ -771,26 +771,29 @@ public class CentralBankStateService
             cmd.Parameters.AddWithValue("$now", now);
             cmd.Parameters.AddWithValue("$h", SecurityService.Sha256Hex(token));
             cmd.Parameters.AddWithValue("$e", email.Trim().ToLowerInvariant());
-            cmd.Parameters.AddWithValue("$exp", now + (long)TimeSpan.FromDays(30).TotalMilliseconds);
+            cmd.Parameters.AddWithValue("$exp", now + (long)TimeSpan.FromDays(365).TotalMilliseconds);
             cmd.ExecuteNonQuery();
         }
         return token;
     }
 
-    /// <summary>Consume (y por tanto invalida) el token de dispositivo. Un token reutilizado o robado ya no sirve.</summary>
+    /// <summary>Valida y renueva la vigencia del token de dispositivo para mantener la sesión abierta sin cierres automáticos.</summary>
     public bool ConsumeDeviceToken(string email, string token)
     {
         if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(email)) return false;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var nextExp = now + (long)TimeSpan.FromDays(365).TotalMilliseconds;
         lock (_dbLock)
         {
             using var conn = new SqliteConnection(_connectionString);
             conn.Open();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM device_tokens WHERE token_hash = $h AND email = $e AND expires_epoch >= $now;";
+            cmd.CommandText = "UPDATE device_tokens SET expires_epoch = $exp WHERE token_hash = $h AND email = $e AND expires_epoch >= $now;";
+            cmd.Parameters.AddWithValue("$exp", nextExp);
             cmd.Parameters.AddWithValue("$h", SecurityService.Sha256Hex(token));
             cmd.Parameters.AddWithValue("$e", email.Trim().ToLowerInvariant());
-            cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-            return cmd.ExecuteNonQuery() == 1;
+            cmd.Parameters.AddWithValue("$now", now);
+            return cmd.ExecuteNonQuery() >= 1;
         }
     }
 
