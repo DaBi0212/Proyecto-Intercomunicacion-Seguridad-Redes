@@ -37,6 +37,7 @@ export class MarketStateService {
   readonly activeBankUrl = signal<string>(environment.bankApiUrl);
   readonly networkModalOpen = signal<boolean>(false);
   readonly ticketRequests = signal<TicketPurchaseRequest[]>([]);
+  readonly savedUserCards = signal<SavedUserCard[]>([]);
 
   /** HUD biométrico y criptográfico estilo iOS (Face ID / Banco Central) */
   readonly hudState = signal<{ expanded: boolean; label: string; symbol: string }>({
