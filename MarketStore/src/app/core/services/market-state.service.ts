@@ -7,6 +7,7 @@ import {
   OrderStatus,
   Product,
   ProductCategory,
+  SavedUserCard,
   StoreOrder,
   TicketDenomination,
   TicketPurchaseRequest,

@@ -2,6 +2,18 @@ export type TicketDenomination = 50 | 100 | 200 | 500;
 export type TicketStatus = 'active' | 'used' | 'expired';
 export type UserRole = 'buyer' | 'seller';
 
+export interface SavedUserCard {
+  id: string;
+  accountNumber: string;
+  last4: string;
+  expiry: string;
+  cvc: string;
+  brand: string;
+  holderName: string;
+  icon: string;
+  bg: string;
+}
+
 export interface UserAccount {
   id: string;
   name: string;
@@ -14,6 +26,7 @@ export interface UserAccount {
   unusedTicketsCount?: number;
   unusedBalance?: number;
   storeCredit?: number;
+  savedCardsJson?: string;
 }
 
 export interface BankTicket {
