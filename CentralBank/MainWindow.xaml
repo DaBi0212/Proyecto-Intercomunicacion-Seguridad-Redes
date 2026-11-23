@@ -771,17 +771,18 @@
                                 Padding="22,18"
                                 Margin="0,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="2. CENTRO DE AUTORIZACIÓN DE COMPRAS · CONEXIÓN EN VIVO CON MARKETSTORE (VERCEL)"
+                                <TextBlock Text="2. COMPRAS EN MARKETSTORE · VALIDACIÓN AUTOMÁTICA DEL BANCO CENTRAL"
                                            FontSize="10.5"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource IosBlue}" />
-                                <TextBlock Text="Verificación de Autenticidad de Tickets y Aprobación de Compras en Tienda"
+                                <TextBlock Text="Historial de Compras Verificadas Automáticamente"
                                            FontSize="20"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimary}"
                                            Margin="0,2,0,4" />
-                                <TextBlock Text="Cuando el usuario selecciona productos en MarketStore y solicita pagar con sus tickets de WalletPay, la orden llega aquí para que verifiques la autenticidad de los tickets y apruebes la compra."
+                                <TextBlock Text="Las compras de productos en MarketStore se validan automáticamente: el banco comprueba la autenticidad, titularidad y que cada ticket no haya sido usado antes, y aprueba o rechaza la compra sin intervención del administrador."
                                            FontSize="12.5"
+                                           TextWrapping="Wrap"
                                            Foreground="{DynamicResource TextSecondary}" />
                             </StackPanel>
                         </Border>
@@ -794,13 +795,13 @@
                                 Padding="36,42"
                                 Visibility="Visible">
                             <StackPanel HorizontalAlignment="Center" MaxWidth="560">
-                                <TextBlock Text="No hay solicitudes de compra de MarketStore en este momento"
+                                <TextBlock Text="Aún no hay compras de MarketStore"
                                            FontSize="18"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource TextPrimary}"
                                            HorizontalAlignment="Center"
                                            Margin="0,0,0,8" />
-                                <TextBlock Text="Flujo completo:&#x0a;1. El usuario compra tickets en WalletPay.&#x0a;2. En WalletPay presiona 'Usar en Tienda Virtual' para abrir MarketStore.&#x0a;3. En MarketStore selecciona los productos que desea y confirma el pago con sus tickets.&#x0a;4. La solicitud aparecerá aquí al instante para que verifiques la autenticidad de los tickets y apruebes la compra."
+                                <TextBlock Text="Flujo completo:&#x0a;1. El usuario compra tickets en WalletPay (el administrador aprueba el pago con tarjeta).&#x0a;2. En MarketStore selecciona los productos y paga con sus tickets.&#x0a;3. El Banco Central valida automáticamente los tickets y la compra aparece aquí como aprobada o rechazada."
                                            FontSize="13"
                                            Foreground="{DynamicResource TextSecondary}"
                                            TextAlignment="Center"
@@ -864,30 +865,7 @@
                                                            TextWrapping="Wrap" />
                                             </Border>
 
-                                            <!-- Botones del Administrador: 1. Verificar Autenticidad -> 2. Aprobar Compra -->
-                                            <StackPanel Orientation="Horizontal"
-                                                        HorizontalAlignment="Right"
-                                                        Visibility="{Binding IsPending, Converter={StaticResource BoolToVisConv}}">
-                                                <Button Style="{StaticResource AppleSecondaryBtn}"
-                                                        Padding="14,9"
-                                                        Margin="0,0,10,0"
-                                                        Tag="{Binding OrderId}"
-                                                        Click="OnVerifyOrderTicketsAuthenticityClick"
-                                                        Content="1. Verificar Autenticidad de Tickets" />
-                                                <Button Style="{StaticResource ApplePrimaryBtn}"
-                                                        Background="#34C759"
-                                                        Padding="18,9"
-                                                        Margin="0,0,10,0"
-                                                        Tag="{Binding OrderId}"
-                                                        Click="OnApproveOrderPurchaseClick"
-                                                        Content="2. Aprobar Compra y Marcar Tickets Usados" />
-                                                <Button Style="{StaticResource AppleSecondaryBtn}"
-                                                        Foreground="#FF3B30"
-                                                        Padding="14,9"
-                                                        Tag="{Binding OrderId}"
-                                                        Click="OnRejectOrderPurchaseClick"
-                                                        Content="Rechazar" />
-                                            </StackPanel>
+                                            <!-- Las compras de MarketStore se validan automáticamente: no requieren botones del administrador -->
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>

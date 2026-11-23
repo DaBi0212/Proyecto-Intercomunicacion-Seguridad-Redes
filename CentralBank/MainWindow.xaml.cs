@@ -46,9 +46,11 @@ public partial class MainWindow : Window
         }
         catch { }
 
-        // Iniciar servidor API embebido en http://0.0.0.0:5050/ respaldado por SQLite (accesible por Wi-Fi LAN y Localhost)
+        // Iniciar servidor API embebido en http://0.0.0.0:7070/ respaldado por SQLite.
+        // Si otra consola de CentralBank ya atiende el puerto, esta ventana funciona como
+        // consola de administrador adicional sobre la misma base SQLite (multi-administrador).
         _apiServer = new CentralBankApiServer(_state);
-        _apiServer.Start();
+        var isPrimaryConsole = _apiServer.Start();
 
         _state.StateChanged += summary =>
         {
@@ -59,6 +61,7 @@ public partial class MainWindow : Window
                     lock (_state.SyncRoot)
                     {
                         _state.ReloadFromDatabase();
+                        _lastStateFingerprint = ComputeStateFingerprint();
                         RefreshAllViews();
                     }
                     _ = TriggerDynamicIslandHudAsync(summary);
@@ -67,85 +70,128 @@ public partial class MainWindow : Window
             });
         };
 
-        _state.PendingOrderCreated += pendingOrder =>
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                try
-                {
-                    lock (_state.SyncRoot)
-                    {
-                        _state.ReloadFromDatabase();
-                        RefreshAllViews();
-                    }
-                    SwitchMainTab("APPROVALS");
-                    _ = TriggerDynamicIslandHudAsync($"¡Nueva compra #{pendingOrder.OrderId} en MarketStore espera verificación!");
-                }
-                catch { }
-            });
-        };
-
-        _state.PendingTicketRequestCreated += pendingReq =>
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                try
-                {
-                    lock (_state.SyncRoot)
-                    {
-                        _state.ReloadFromDatabase();
-                        RefreshAllViews();
-                    }
-                    SwitchMainTab("APPROVALS");
-                    _ = TriggerDynamicIslandHudAsync($"¡Validar tarjeta! {pendingReq.UserName} solicita Ticket de ${pendingReq.Amount} (#{pendingReq.RequestId})");
-                }
-                catch { }
-            });
-        };
-
-        // Temporizador de sincronización continua con SQLite para reflejar cualquier cambio al instante
+        // Temporizador de sincronización continua con SQLite: refleja al instante en TODAS las consolas
+        // abiertas las aprobaciones, rechazos, auditorías y compras realizadas por cualquier administrador.
         _liveSyncTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(1.5)
+            Interval = TimeSpan.FromSeconds(1.2)
         };
         _liveSyncTimer.Tick += (_, _) =>
         {
             try
             {
+                List<string> newPending;
+                List<string> resolvedElsewhere;
                 lock (_state.SyncRoot)
                 {
-                    var prevTxCount = _state.Transactions.Count;
-                    var prevTicketCount = _state.Tickets.Count;
-                    var prevOrderCount = _state.Orders.Count;
-                    var prevPendingCount = _state.TotalPendingApprovalsCount;
-                    var prevReqCount = _state.TicketRequests.Count;
-                    var prevUserCount = _state.Users.Count;
-
+                    var prevPending = _state.TicketRequests.Where(r => r.IsPending).Select(r => r.RequestId).ToHashSet();
                     _state.ReloadFromDatabase();
+                    var fingerprint = ComputeStateFingerprint();
+                    if (fingerprint == _lastStateFingerprint) return;
+                    _lastStateFingerprint = fingerprint;
 
-                    if (_state.Transactions.Count != prevTxCount ||
-                        _state.Tickets.Count != prevTicketCount ||
-                        _state.Orders.Count != prevOrderCount ||
-                        _state.TotalPendingApprovalsCount != prevPendingCount ||
-                        _state.TicketRequests.Count != prevReqCount ||
-                        _state.Users.Count != prevUserCount)
+                    var nowPending = _state.TicketRequests.Where(r => r.IsPending).Select(r => r.RequestId).ToHashSet();
+                    newPending = nowPending.Where(id => !prevPending.Contains(id)).ToList();
+                    resolvedElsewhere = prevPending
+                        .Where(id => !nowPending.Contains(id) && !_locallyProcessedRequests.Contains(id))
+                        .ToList();
+
+                    RefreshAllViews();
+                }
+
+                if (newPending.Count > 0)
+                {
+                    var req = _state.TicketRequests.FirstOrDefault(r => r.RequestId == newPending[0]);
+                    if (req != null)
                     {
-                        RefreshAllViews();
+                        _ = TriggerDynamicIslandHudAsync($"¡Validar tarjeta! {req.UserName} solicita Ticket de ${req.Amount} (#{req.RequestId})");
                     }
+                }
+                else if (resolvedElsewhere.Count > 0)
+                {
+                    var req = _state.TicketRequests.FirstOrDefault(r => r.RequestId == resolvedElsewhere[0]);
+                    var verb = req?.IsRejected == true ? "rechazó" : "aprobó";
+                    _ = TriggerDynamicIslandHudAsync($"Otro administrador {verb} la solicitud #{resolvedElsewhere[0]}");
                 }
             }
             catch { }
         };
         _liveSyncTimer.Start();
 
+        // Si la consola principal se cierra, una consola adicional toma automáticamente el servidor API :7070.
+        _serverFailoverTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(4)
+        };
+        _serverFailoverTimer.Tick += async (_, _) =>
+        {
+            if (_apiServer.IsRunning || _failoverAttemptInFlight) return;
+            _failoverAttemptInFlight = true;
+            try
+            {
+                var tookOver = await Task.Run(() => _apiServer.Start(quiet: true));
+                if (tookOver)
+                {
+                    UpdateConsoleRoleTitle(true);
+                    _ = TriggerDynamicIslandHudAsync("Esta consola ahora atiende el servidor API :7070");
+                }
+            }
+            catch { }
+            finally
+            {
+                _failoverAttemptInFlight = false;
+            }
+        };
+        _serverFailoverTimer.Start();
+
         Closing += (_, _) =>
         {
             _liveSyncTimer.Stop();
+            _serverFailoverTimer.Stop();
             _apiServer.Dispose();
         };
 
         ApplyActiveTabVisuals();
         RefreshAllViews();
+        _lastStateFingerprint = ComputeStateFingerprint();
+        UpdateConsoleRoleTitle(isPrimaryConsole);
+        _ = TriggerDynamicIslandHudAsync(isPrimaryConsole
+            ? "Consola principal · Servidor API :7070 activo"
+            : "Consola de administrador adicional · Sincronizada en tiempo real");
+    }
+
+    private readonly System.Windows.Threading.DispatcherTimer _serverFailoverTimer;
+    private bool _failoverAttemptInFlight;
+    private string _lastStateFingerprint = string.Empty;
+    private readonly HashSet<string> _locallyProcessedRequests = new(StringComparer.OrdinalIgnoreCase);
+
+    private void UpdateConsoleRoleTitle(bool isPrimary)
+    {
+        const string marker = " · ";
+        var baseTitle = Title.Contains(marker + "Administrador adicional") || Title.Contains(marker + "Consola principal")
+            ? Title[..Title.LastIndexOf(marker, StringComparison.Ordinal)]
+            : Title;
+        Title = baseTitle + marker + (isPrimary ? "Consola principal" : "Administrador adicional");
+    }
+
+    /// <summary>Huella del estado compartido para detectar cambios hechos por cualquier administrador.</summary>
+    private string ComputeStateFingerprint()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append(_state.Users.Count).Append('|')
+          .Append(_state.Tickets.Count).Append('|')
+          .Append(_state.UsedTicketsCount).Append('|')
+          .Append(_state.Transactions.Count).Append('|')
+          .Append(_state.Orders.Count).Append('|')
+          .Append(_state.Users.Sum(u => u.StoreCredit)).Append('|');
+        foreach (var r in _state.TicketRequests)
+            sb.Append(r.RequestId).Append(':').Append(r.ApprovalStatus).Append(';');
+        foreach (var o in _state.Orders)
+            sb.Append(o.OrderId).Append(':').Append(o.ApprovalStatus).Append(o.IsAuthenticityVerified ? 'V' : '-').Append(';');
+        var lastLog = _state.AuditLogs.FirstOrDefault();
+        if (lastLog != null)
+            sb.Append(_state.AuditLogs.Count).Append(lastLog.Time).Append(lastLog.Message);
+        return sb.ToString();
     }
 
     // =========================================================================
@@ -383,11 +429,13 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is string requestId)
         {
+            btn.IsEnabled = false;
+            _locallyProcessedRequests.Add(requestId);
             var (ok, msg, minted) = _state.ApproveTicketPurchaseRequest(requestId);
             RefreshAllViews();
             _ = TriggerDynamicIslandHudAsync(ok && minted != null
                 ? $"Pago aprobado (#{requestId}) · Ticket {minted.Id} (${minted.Amount}) emitido"
-                : $"No se pudo aprobar #{requestId}: {msg}");
+                : $"#{requestId}: {msg}");
         }
     }
 
@@ -395,9 +443,13 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is string requestId)
         {
-            _state.RejectTicketPurchaseRequest(requestId, "Pago de tarjeta rechazado manualmente por el Administrador del Banco Central.");
+            btn.IsEnabled = false;
+            _locallyProcessedRequests.Add(requestId);
+            var rejected = _state.RejectTicketPurchaseRequest(requestId, "Pago de tarjeta rechazado manualmente por el Administrador del Banco Central.");
             RefreshAllViews();
-            _ = TriggerDynamicIslandHudAsync($"Pago de tarjeta #{requestId} rechazado");
+            _ = TriggerDynamicIslandHudAsync(rejected
+                ? $"Pago de tarjeta #{requestId} rechazado"
+                : $"#{requestId}: otro administrador ya procesó esta solicitud");
         }
     }
 
