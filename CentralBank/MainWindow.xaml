@@ -42,32 +42,20 @@
 
                         <!-- Identidad del Banco Central con el logo horizontal oficial -->
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Image Source="pack://application:,,,/Assets/centralbank-horizontal.png"
-                                       Height="24"
-                                       Margin="0,0,10,0"
-                                       VerticalAlignment="Center"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-                            </StackPanel>
-                            <TextBlock x:Name="HeaderLanIpText"
-                                       Text="Conectado en tiempo real en red local (0.0.0.0:7070) con WalletPay APK y MarketStore Vercel"
-                                       FontSize="11.5"
-                                       Margin="0,3,0,0"
-                                       Foreground="{DynamicResource TextSecondary}" />
+                            <Image Source="pack://application:,,,/Assets/centralbank-horizontal.png"
+                                   Height="28"
+                                   VerticalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
                         </StackPanel>
 
-                        <!-- Dynamic Island Pill centrada sin sobreponerse -->
+                        <!-- Dynamic Island Pill oculta permanentemente a petición del usuario -->
                         <Border x:Name="DynamicIslandBorder"
                                 Grid.Column="1"
-                                Background="#1C1C1E"
-                                CornerRadius="18"
-                                Padding="16,7"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
+                                Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <Ellipse x:Name="HudPulseDot" Width="8" Height="8" Fill="#30D158" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock x:Name="HudStatusText"
-                                           Text="SQLite Activo · Escuchando WalletPay y MarketStore"
+                                           Text=""
                                            Foreground="White"
                                            FontSize="12"
                                            FontWeight="SemiBold"
