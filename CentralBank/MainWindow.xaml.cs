@@ -103,8 +103,6 @@ public partial class MainWindow : Window
             });
         };
 
-        
-
         // Temporizador de sincronización continua con SQLite para reflejar cualquier cambio al instante
         _liveSyncTimer = new System.Windows.Threading.DispatcherTimer
         {
