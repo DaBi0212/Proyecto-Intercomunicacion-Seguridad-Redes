@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, UpperCasePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
   IonHeader,
@@ -35,9 +36,13 @@ interface PaymentMethod {
   sub: string;
   icon: string;
   tint: string;
+  isCustom?: boolean;
+  fullCardNumber?: string;
+  expiry?: string;
+  cvc?: string;
 }
 
-type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
+type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'rejected';
 
 @Component({
   selector: 'app-store',
@@ -45,6 +50,7 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
   imports: [
     CurrencyPipe,
     UpperCasePipe,
+    FormsModule,
     IonHeader,
     IonToolbar,
     IonTitle,
@@ -115,7 +121,7 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
       <!-- Tarjeta resumen de saldo disponible en bóveda -->
       <section class="balance-card continuous">
         <div class="bal-main">
-          <span class="balance-label">Saldo disponible en bóveda</span>
+          <span class="balance-label">Saldo disponible en tu wallet</span>
           <span class="balance-amount">
             {{ wallet.availableBalance() | currency: 'MXN' : 'symbol-narrow' }}<small>MXN</small>
           </span>
@@ -129,7 +135,7 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
       <header class="section-head">
         <div>
           <h2>Denominaciones oficiales</h2>
-          <p>Certificados emitidos tras aprobación bancaria de tu tarjeta</p>
+          <p>Los cargos de los tickets seran emitidos tras aprobación de CentralBank de tu tarjeta</p>
         </div>
       </header>
 
@@ -203,7 +209,7 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
       <p class="footnote">
         <sf-symbol name="shield.checkered" [size]="16" />
         <span>
-          Cada compra de ticket es validada y aprobada por el Administrador en CentralBank Desktop (simulando la autorización bancaria de tu tarjeta sin requerir datos reales).
+          Cada compra de ticket es validada y aprobada por CentralBank.
         </span>
       </p>
 
@@ -225,6 +231,7 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
                     @case ('done') { ¡Pago Aprobado! }
                     @case ('waiting_approval') { Validando Tarjeta en Banco }
                     @case ('rejected') { Pago Rechazado }
+                    @case ('adding_card') { Agregar Tarjeta de Débito / Crédito }
                     @default { Confirmar compra de ticket }
                   }
                 </span>
@@ -234,20 +241,22 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
               </div>
 
               <!-- Mini tarjeta en el modal -->
-              <div class="sheet-card continuous" [class]="'sheet-card continuous ' + d.cls">
-                <div class="sc-top">
-                  <span class="sc-issuer">
-                    <sf-symbol name="building.columns" [size]="13" [weight]="2" />
-                    Banco Central
-                  </span>
-                  <span class="emv-mini"></span>
+              @if (state() !== 'adding_card') {
+                <div class="sheet-card continuous" [class]="'sheet-card continuous ' + d.cls">
+                  <div class="sc-top">
+                    <span class="sc-issuer">
+                      <sf-symbol name="building.columns" [size]="13" [weight]="2" />
+                      Banco Central
+                    </span>
+                    <span class="emv-mini"></span>
+                  </div>
+                  <span class="sheet-card-amount"><span class="cur">$</span>{{ d.amount }}<small>.00</small></span>
+                  <div class="sc-bottom">
+                    <span>Ticket {{ d.tier }} · MXN</span>
+                    <span class="sc-code">{{ d.code }}</span>
+                  </div>
                 </div>
-                <span class="sheet-card-amount"><span class="cur">$</span>{{ d.amount }}<small>.00</small></span>
-                <div class="sc-bottom">
-                  <span>Ticket {{ d.tier }} · MXN</span>
-                  <span class="sc-code">{{ d.code }}</span>
-                </div>
-              </div>
+              }
 
               @if (state() === 'done') {
                 <div class="done">
@@ -282,9 +291,103 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
                     Intentar con otro método de pago
                   </button>
                 </div>
+              } @else if (state() === 'adding_card') {
+                <div class="add-card-box">
+                  <!-- Previsualización interactiva de la tarjeta ingresada -->
+                  <div class="custom-card-preview continuous" [style.background]="previewCardBrand().gradient">
+                    <div class="ccp-top">
+                      <span class="ccp-bank">
+                        <sf-symbol name="creditcard.fill" [size]="14" />
+                        <span>{{ previewCardBrand().name }}</span>
+                      </span>
+                      <span class="emv-mini"></span>
+                    </div>
+                    <div class="ccp-number mono">
+                      {{ newCardNumber.trim() || '•••• •••• •••• ••••' }}
+                    </div>
+                    <div class="ccp-bottom">
+                      <div>
+                        <small>VENCIMIENTO</small>
+                        <strong class="mono">{{ newCardExpiry.trim() || 'MM/AA' }}</strong>
+                      </div>
+                      <div>
+                        <small>CVC / CVV</small>
+                        <strong class="mono">{{ newCardCvc.trim() || '•••' }}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="card-form continuous">
+                    <label class="cf-field">
+                      <span>NÚMERO DE TARJETA O CUENTA (16 DÍGITOS)</span>
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        maxlength="19"
+                        class="mono"
+                        placeholder="4532 •••• •••• 1234"
+                        [(ngModel)]="newCardNumber"
+                        (input)="formatCardNumberInput()"
+                      />
+                    </label>
+                    <div class="cf-row">
+                      <label class="cf-field">
+                        <span>VENCIMIENTO (MM/AA)</span>
+                        <input
+                          type="text"
+                          inputmode="numeric"
+                          maxlength="5"
+                          class="mono"
+                          placeholder="08/29"
+                          [(ngModel)]="newCardExpiry"
+                          (input)="formatCardExpiryInput()"
+                        />
+                      </label>
+                      <label class="cf-field">
+                        <span>CVC / CVV</span>
+                        <input
+                          type="text"
+                          inputmode="numeric"
+                          maxlength="4"
+                          class="mono"
+                          placeholder="123"
+                          [(ngModel)]="newCardCvc"
+                          (input)="formatCardCvcInput()"
+                        />
+                      </label>
+                    </div>
+                    <label class="cf-field">
+                      <span>ALIAS O BANCO (OPCIONAL)</span>
+                      <input
+                        type="text"
+                        maxlength="30"
+                        placeholder="Ej. Mi Tarjeta Débito BBVA / Nu"
+                        [(ngModel)]="newCardAlias"
+                      />
+                    </label>
+                  </div>
+
+                  @if (cardFormError()) {
+                    <p class="cf-error">{{ cardFormError() }}</p>
+                  }
+
+                  <p class="cf-hint">
+                    Puedes ingresar datos simulados de prueba. El Administrador en <strong>CentralBank Desktop</strong> verificará tu tarjeta y aprobará o rechazará la compra.
+                  </p>
+
+                  <div class="cf-actions">
+                    <button type="button" class="cf-cancel continuous apple-pressable" (click)="cancelAddCard()">
+                      Volver
+                    </button>
+                    <button type="button" class="cf-save continuous apple-pressable" (click)="saveCustomCard()">
+                      <sf-symbol name="checkmark.circle.fill" [size]="18" />
+                      <span>Usar esta Tarjeta</span>
+                    </button>
+                  </div>
+                </div>
               } @else {
                 <ion-list [inset]="true">
-                  @for (m of methods; track m.id) {
+                  @for (m of allPaymentMethods(); track m.id) {
                     <ion-item button [detail]="false" (click)="selectMethod(m.id)">
                       <span slot="start" class="method-icon" [style.background]="m.tint">
                         <sf-symbol [name]="m.icon" [size]="17" [weight]="2" />
@@ -296,8 +399,30 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
                       @if (payment() === m.id) {
                         <sf-symbol slot="end" class="check" name="checkmark" [size]="18" [weight]="2.6" />
                       }
+                      @if (m.isCustom) {
+                        <button
+                          slot="end"
+                          type="button"
+                          class="del-card-btn"
+                          title="Eliminar tarjeta"
+                          (click)="$event.stopPropagation(); removeCustomCard(m.id)"
+                        >
+                          <sf-symbol name="xmark" [size]="12" [weight]="2.4" />
+                        </button>
+                      }
                     </ion-item>
                   }
+                  <ion-item button [detail]="false" (click)="openAddCardForm()">
+                    <span slot="start" class="method-icon" style="background: #34C759">
+                      <sf-symbol name="plus" [size]="17" [weight]="2.6" />
+                    </span>
+                    <ion-label>
+                      <h3 style="color: var(--ion-color-primary); font-weight: 600 !important;">
+                        + Agregar mi propia tarjeta de Débito / Crédito
+                      </h3>
+                      <p>Ingresa número de cuenta, vencimiento y CVC para validar en CentralBank</p>
+                    </ion-label>
+                  </ion-item>
                 </ion-list>
 
                 <ion-list [inset]="true">
@@ -324,7 +449,7 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
                     <span>{{ payLabel() }}</span>
                   </button>
                   <p class="sheet-foot">
-                    El Administrador del Banco Central validará y aprobará el pago de tu tarjeta antes de emitir el ticket.
+                    CentralBank validará y aprobará el pago de tu tarjeta antes de emitir el ticket.
                   </p>
                 </div>
               }
@@ -936,6 +1061,151 @@ type SheetState = 'idle' | 'waiting_approval' | 'done' | 'rejected';
       from { opacity: 0; transform: scale(0.85); }
       to { opacity: 1; transform: scale(1); }
     }
+
+    /* Agregar Tarjeta Personalizada */
+    .add-card-box {
+      padding: 6px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .custom-card-preview {
+      --r: 18px;
+      padding: 16px 18px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 142px;
+      box-shadow: var(--ios-shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    .ccp-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+    .ccp-bank {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ccp-number {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin: 14px 0 10px;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+    .ccp-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .ccp-bottom div {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .ccp-bottom small {
+      font-size: 9px;
+      font-weight: 700;
+      opacity: 0.78;
+      letter-spacing: 0.06em;
+    }
+    .ccp-bottom strong {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .card-form {
+      --r: 16px;
+      background: var(--ios-cell);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cf-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .cf-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cf-field span {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--ios-label-2);
+    }
+    .cf-field input {
+      height: 40px;
+      border-radius: 10px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      padding: 0 12px;
+      font-size: 14px;
+      font-weight: 600;
+      outline: none;
+    }
+    .cf-error {
+      margin: 0 4px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ion-color-danger);
+    }
+    .cf-hint {
+      margin: 0 4px;
+      font-size: 11.5px;
+      line-height: 1.38;
+      color: var(--ios-label-2);
+    }
+    .cf-actions {
+      display: grid;
+      grid-template-columns: 0.9fr 1.4fr;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    .cf-cancel,
+    .cf-save {
+      --r: 13px;
+      height: 46px;
+      border: 0;
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .cf-cancel {
+      background: var(--ios-cell);
+      color: var(--ios-label);
+    }
+    .cf-save {
+      background: var(--ion-color-primary);
+      color: #fff;
+    }
+    .del-card-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 0;
+      margin-left: 6px;
+      background: rgba(142, 142, 147, 0.18);
+      color: var(--ios-label-2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
   `]
 })
 export class StorePage {
@@ -978,7 +1248,7 @@ export class StorePage {
     }
   ];
 
-  readonly methods: PaymentMethod[] = [
+  readonly defaultMethods: PaymentMethod[] = [
     {
       id: 'Tarjeta Visa •••• 4821',
       title: 'Tarjeta de Débito o Crédito',
@@ -1002,6 +1272,18 @@ export class StorePage {
     }
   ];
 
+  readonly customCards = signal<PaymentMethod[]>(this.loadSavedCustomCards());
+  readonly allPaymentMethods = computed<PaymentMethod[]>(() => [
+    ...this.customCards(),
+    ...this.defaultMethods
+  ]);
+
+  newCardNumber = '';
+  newCardExpiry = '';
+  newCardCvc = '';
+  newCardAlias = '';
+  readonly cardFormError = signal('');
+
   readonly sheetOpen = signal(false);
   readonly selected = signal<Denomination | null>(null);
   readonly payment = signal('Tarjeta Visa •••• 4821');
@@ -1013,11 +1295,146 @@ export class StorePage {
 
   readonly payLabel = computed(() => 'Solicitar Aprobación del Banco Central');
 
+  private loadSavedCustomCards(): PaymentMethod[] {
+    try {
+      const raw = localStorage.getItem('wp_custom_user_cards_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  }
+
+  private persistCustomCards(list: PaymentMethod[]): void {
+    this.customCards.set(list);
+    try {
+      localStorage.setItem('wp_custom_user_cards_v1', JSON.stringify(list));
+    } catch {}
+  }
+
+  previewCardBrand(): { name: string; tint: string; gradient: string } {
+    const digits = this.newCardNumber.replace(/\D/g, '');
+    if (digits.startsWith('5') || digits.startsWith('2')) {
+      return {
+        name: this.newCardAlias.trim() || 'Mastercard Débito / Crédito',
+        tint: '#EA580C',
+        gradient: 'linear-gradient(135deg, #EA580C 0%, #9A1B1B 100%)'
+      };
+    }
+    if (digits.startsWith('3')) {
+      return {
+        name: this.newCardAlias.trim() || 'American Express',
+        tint: '#0284C7',
+        gradient: 'linear-gradient(135deg, #0284C7 0%, #1E3A8A 100%)'
+      };
+    }
+    return {
+      name: this.newCardAlias.trim() || 'Visa Débito / Crédito',
+      tint: '#204DC5',
+      gradient: 'linear-gradient(135deg, #204DC5 0%, #0F256E 100%)'
+    };
+  }
+
+  formatCardNumberInput(): void {
+    const digits = this.newCardNumber.replace(/\D/g, '').substring(0, 16);
+    const groups = digits.match(/.{1,4}/g) || [];
+    this.newCardNumber = groups.join(' ');
+    this.cardFormError.set('');
+  }
+
+  formatCardExpiryInput(): void {
+    let digits = this.newCardExpiry.replace(/\D/g, '').substring(0, 4);
+    if (digits.length >= 3) {
+      this.newCardExpiry = `${digits.substring(0, 2)}/${digits.substring(2)}`;
+    } else {
+      this.newCardExpiry = digits;
+    }
+    this.cardFormError.set('');
+  }
+
+  formatCardCvcInput(): void {
+    this.newCardCvc = this.newCardCvc.replace(/\D/g, '').substring(0, 4);
+    this.cardFormError.set('');
+  }
+
+  openAddCardForm(): void {
+    this.wallet.haptic('selection');
+    this.newCardNumber = '';
+    this.newCardExpiry = '';
+    this.newCardCvc = '';
+    this.newCardAlias = '';
+    this.cardFormError.set('');
+    this.state.set('adding_card');
+  }
+
+  cancelAddCard(): void {
+    this.wallet.haptic('light');
+    this.state.set('idle');
+  }
+
+  saveCustomCard(): void {
+    const digits = this.newCardNumber.replace(/\D/g, '');
+    if (digits.length < 12) {
+      this.cardFormError.set('Ingresa al menos 12 a 16 dígitos del número de tarjeta o cuenta.');
+      this.wallet.haptic('error');
+      return;
+    }
+    const exp = this.newCardExpiry.trim();
+    if (!/^\d{2}\/\d{2}$/.test(exp)) {
+      this.cardFormError.set('Ingresa la fecha de vencimiento en formato MM/AA (ej. 08/29).');
+      this.wallet.haptic('error');
+      return;
+    }
+    const cvc = this.newCardCvc.trim();
+    if (cvc.length < 3) {
+      this.cardFormError.set('Ingresa el código CVC / CVV de 3 o 4 dígitos.');
+      this.wallet.haptic('error');
+      return;
+    }
+
+    const brand = this.previewCardBrand();
+    const last4 = digits.slice(-4);
+    const formattedNum = (digits.match(/.{1,4}/g) || [digits]).join(' ');
+    // Este ID viaja a CentralBank Desktop para que el Administrador vea la tarjeta, vencimiento y CVC
+    const methodId = `${brand.name} (${formattedNum} · Vence ${exp} · CVC ${cvc})`;
+
+    const newMethod: PaymentMethod = {
+      id: methodId,
+      title: `${brand.name} •••• ${last4}`,
+      sub: `Cuenta ${formattedNum} · Vence ${exp} · CVC ${cvc}`,
+      icon: 'creditcard.fill',
+      tint: brand.tint,
+      isCustom: true,
+      fullCardNumber: formattedNum,
+      expiry: exp,
+      cvc
+    };
+
+    const updated = [newMethod, ...this.customCards().filter((c) => c.id !== methodId)];
+    this.persistCustomCards(updated);
+    this.payment.set(methodId);
+    this.wallet.haptic('success');
+    this.state.set('idle');
+  }
+
+  removeCustomCard(id: string): void {
+    this.wallet.haptic('light');
+    const updated = this.customCards().filter((c) => c.id !== id);
+    this.persistCustomCards(updated);
+    if (this.payment() === id) {
+      this.payment.set(updated[0]?.id || this.defaultMethods[0].id);
+    }
+  }
+
   open(d: Denomination): void {
     this.wallet.haptic('light');
     this.selected.set(d);
     this.state.set('idle');
     this.cancelWaitingFlag = false;
+    if (this.customCards().length > 0 && !this.allPaymentMethods().some((m) => m.id === this.payment())) {
+      this.payment.set(this.customCards()[0].id);
+    }
     this.sheetOpen.set(true);
   }
 

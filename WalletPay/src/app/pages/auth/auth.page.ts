@@ -19,8 +19,8 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             <span>
               {{
                 wallet.bankConnected()
-                  ? 'Banco Central Conectado Automáticamente'
-                  : 'Descubriendo Banco Central Automáticamente…'
+                  ? 'Servidor de CentralBank activo'
+                  : 'Servidor de CentralBank inactivo'
               }}
             </span>
           </div>
@@ -40,7 +40,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
             <img src="assets/walletpay-icon.png" alt="WalletPay" class="app-icon-img" />
           </div>
           <h1>WalletPay</h1>
-          <p>Bóveda móvil de tickets del Banco Central sincronizada con MarketStore en Vercel.</p>
+          <p>Billetera móvil de tickets con CentralBank. Compra aqui tus tickets y compra en MarketStore</p>
         </section>
 
         @if (wallet.registeredUsers().length > 0 && !isRegistering()) {
@@ -104,7 +104,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
                   label="Nombre"
                   labelPlacement="fixed"
                   type="text"
-                  placeholder="Ej. Valeria Ríos"
+                  placeholder=" "
                   [(ngModel)]="fullName"
                   (ionInput)="error.set('')"
                 />
@@ -117,7 +117,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
                 type="email"
                 inputmode="email"
                 autocomplete="username"
-                placeholder="usuario@correo.mx"
+                placeholder=" "
                 [(ngModel)]="email"
                 (ionInput)="error.set('')"
               />
@@ -176,10 +176,6 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
               <span>Usar Face ID</span>
             </button>
           }
-
-          <p class="legal">
-            Sincronización automática con <strong>CentralBank</strong> y <strong>MarketStore (Vercel)</strong>.
-          </p>
         </section>
       </main>
     </ion-content>

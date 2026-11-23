@@ -629,7 +629,7 @@ export class WalletStateService {
 
   async toggleTicketQrReveal(ticketId: string): Promise<void> {
     const target = this.tickets().find((t) => t.id === ticketId);
-    if (!target || target.status !== 'active') return;
+    if (!target) return;
 
     if (!target.qrRevealed) {
       await this.triggerBiometricPulse('Desbloqueando QR Oficial', 750);

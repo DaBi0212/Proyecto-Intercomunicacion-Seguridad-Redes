@@ -958,7 +958,7 @@ public class CentralBankStateService
         ReloadFromDatabase();
         var user = FindUser(userEmail) ?? throw new InvalidOperationException("Cuenta no encontrada.");
         paymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "Tarjeta" : paymentMethod.Trim();
-        if (paymentMethod.Length > 60) paymentMethod = paymentMethod[..60];
+        if (paymentMethod.Length > 120) paymentMethod = paymentMethod[..120];
 
         var (tierName, colorClass) = denomination switch
         {
@@ -1088,7 +1088,7 @@ public class CentralBankStateService
         ReloadFromDatabase();
         var user = FindUser(userEmail) ?? throw new InvalidOperationException("Cuenta no encontrada.");
         paymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "Tarjeta de Débito/Crédito Visa •••• 4821" : paymentMethod.Trim();
-        if (paymentMethod.Length > 80) paymentMethod = paymentMethod[..80];
+        if (paymentMethod.Length > 120) paymentMethod = paymentMethod[..120];
 
         var (tierName, colorClass) = denomination switch
         {

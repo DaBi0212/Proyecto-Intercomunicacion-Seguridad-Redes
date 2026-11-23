@@ -226,7 +226,9 @@ interface DenominationCard {
                     <span>
                       {{
                         t.status === 'used'
-                          ? 'Ticket redimido y verificado ante el Banco Central'
+                          ? t.qrRevealed
+                            ? 'Folio TKT y QR visibles · Ticket ya canjeado (Anti-doble gasto)'
+                            : 'Ticket ya canjeado · Toca para revelar Folio TKT y Código QR'
                           : t.qrRevealed
                           ? 'Folio visible · Toca para ocultar'
                           : 'Código protegido · Toca para ver con Face ID'
@@ -242,6 +244,53 @@ interface DenominationCard {
 
       <!-- VISTA 3: ADQUIRIR NUEVOS TICKETS DEL BANCO CENTRAL (1:1 CON WALLETPAY STOREPAGE) -->
       @if (segment() === 'buy') {
+        <section class="custom-card-strip continuous">
+          <div class="ccs-head">
+            <div>
+              <strong>Datos de tu Tarjeta de Débito / Crédito</strong>
+              <span>Estos datos pueden ser simulados. El Administrador de CentralBank verificará y aprobará o rechazará la compra.</span>
+            </div>
+          </div>
+          <div class="ccs-inputs">
+            <label class="ccs-field">
+              <span>NÚMERO DE TARJETA / CUENTA</span>
+              <input
+                type="text"
+                inputmode="numeric"
+                maxlength="19"
+                class="mono"
+                placeholder="4532 •••• •••• 4821"
+                [(ngModel)]="customCardNumber"
+                (input)="formatCardNumber()"
+              />
+            </label>
+            <label class="ccs-field small">
+              <span>VENCIMIENTO (MM/AA)</span>
+              <input
+                type="text"
+                inputmode="numeric"
+                maxlength="5"
+                class="mono"
+                placeholder="08/29"
+                [(ngModel)]="customCardExpiry"
+                (input)="formatCardExpiry()"
+              />
+            </label>
+            <label class="ccs-field small">
+              <span>CVC / CVV</span>
+              <input
+                type="text"
+                inputmode="numeric"
+                maxlength="4"
+                class="mono"
+                placeholder="123"
+                [(ngModel)]="customCardCvc"
+                (input)="formatCardCvc()"
+              />
+            </label>
+          </div>
+        </section>
+
         <div class="denominations-grid">
           @for (d of denominations; track d.amount) {
             <article
@@ -787,6 +836,61 @@ interface DenominationCard {
       font-size: 14px;
       font-weight: 600;
     }
+
+    .custom-card-strip {
+      --r: 20px;
+      padding: 18px 20px;
+      background: var(--ios-cell);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ccs-head div {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ccs-head strong {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .ccs-head span {
+      font-size: 12.5px;
+      color: var(--ios-label-2);
+    }
+    .ccs-inputs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .ccs-field {
+      flex: 2;
+      min-width: 210px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ccs-field.small {
+      flex: 1;
+      min-width: 120px;
+    }
+    .ccs-field span {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: var(--ios-label-2);
+    }
+    .ccs-field input {
+      height: 40px;
+      border-radius: 11px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      padding: 0 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      outline: none;
+    }
   `]
 })
 export class WalletPage {
@@ -796,8 +900,25 @@ export class WalletPage {
   readonly segment = signal<'active' | 'used' | 'buy'>('active');
   externalFolio = '';
   externalDenom: TicketDenomination = 100;
+  customCardNumber = '';
+  customCardExpiry = '';
+  customCardCvc = '';
   readonly importFeedback = signal<string>('');
   private qrSvgCache = new Map<string, { viewBox: string; path: string; size: number }>();
+
+  formatCardNumber(): void {
+    const digits = this.customCardNumber.replace(/\D/g, '').substring(0, 16);
+    this.customCardNumber = (digits.match(/.{1,4}/g) || []).join(' ');
+  }
+
+  formatCardExpiry(): void {
+    const digits = this.customCardExpiry.replace(/\D/g, '').substring(0, 4);
+    this.customCardExpiry = digits.length >= 3 ? `${digits.substring(0, 2)}/${digits.substring(2)}` : digits;
+  }
+
+  formatCardCvc(): void {
+    this.customCardCvc = this.customCardCvc.replace(/\D/g, '').substring(0, 4);
+  }
 
   getQrSvgForTicket(t: BankTicket): { viewBox: string; path: string; size: number } {
     const payload =
@@ -869,12 +990,20 @@ export class WalletPage {
 
   async purchaseDenomination(d: DenominationCard): Promise<void> {
     try {
+      const digits = this.customCardNumber.replace(/\D/g, '');
+      const exp = this.customCardExpiry.trim() || '08/29';
+      const cvc = this.customCardCvc.trim() || '482';
+      const methodLabel =
+        digits.length >= 12
+          ? `Tarjeta Débito/Crédito (${this.customCardNumber.trim()} · Vence ${exp} · CVC ${cvc})`
+          : 'Tarjeta Visa •••• 4821 (MarketStore)';
+
       this.importFeedback.set(
-        `Solicitando Ticket $${d.amount} MXN · Esperando aprobación del pago con tarjeta en CentralBank Desktop...`
+        `Solicitando Ticket $${d.amount} MXN con ${methodLabel} · Esperando aprobación en CentralBank Desktop...`
       );
       await this.market.acquireBankTicket(
         d.amount,
-        'Tarjeta Visa •••• 4821 (MarketStore)',
+        methodLabel,
         (msg) => this.importFeedback.set(msg)
       );
       this.importFeedback.set(`¡Pago aprobado por el Banco Central! Ticket de $${d.amount} MXN emitido.`);

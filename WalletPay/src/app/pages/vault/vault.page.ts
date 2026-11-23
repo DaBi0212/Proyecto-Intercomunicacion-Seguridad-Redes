@@ -250,7 +250,9 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                     <span>
                       {{
                         t.status === 'used'
-                          ? 'Ticket ya utilizado · Bloqueo anti-doble gasto activo'
+                          ? t.qrRevealed
+                            ? 'Folio y QR visibles · Ticket ya utilizado (Anti-doble gasto activo)'
+                            : 'Ticket ya utilizado · Toca para revelar Folio TKT y Código QR'
                           : t.qrRevealed
                           ? 'QR activo · Tu amigo puede escanearlo con su cámara'
                           : 'Código QR protegido · Toca para desbloquear y compartir'
@@ -300,6 +302,11 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                 }
               </p>
             } @else {
+              <button class="share-qr-btn continuous apple-pressable" (click)="openShareQrModal(sel)">
+                <sf-symbol name="qrcode" [size]="19" [weight]="2" />
+                <span>Ver Código TKT ({{ sel.id }}) y QR Oficial</span>
+              </button>
+
               <div class="used-banner continuous">
                 <sf-symbol name="checkmark.seal.fill" [size]="20" />
                 <span>
@@ -325,7 +332,9 @@ type RedeemState = 'idle' | 'verifying' | 'done';
           <div class="sheet qr-share-sheet">
             @if (current(); as sel) {
               <div class="sheet-head">
-                <span class="sheet-title">Compartir Ticket con Amigo</span>
+                <span class="sheet-title">
+                  {{ sel.status === 'used' ? 'Código TKT y QR de Ticket Usado' : 'Compartir Ticket con Amigo' }}
+                </span>
                 <button class="sheet-close" aria-label="Cerrar" (click)="shareQrOpen.set(false)">
                   <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
                 </button>
@@ -1471,7 +1480,6 @@ export class VaultPage implements OnDestroy {
   }
 
   async openShareQrModal(ticket: BankTicket): Promise<void> {
-    if (ticket.status !== 'active') return;
     this.wallet.haptic('light');
     if (!ticket.qrRevealed) {
       await this.wallet.toggleTicketQrReveal(ticket.id);
@@ -1514,7 +1522,7 @@ export class VaultPage implements OnDestroy {
       const videoEl = this.cameraVideoRef?.nativeElement;
       if (videoEl) {
         videoEl.srcObject = stream;
-        await videoEl.play().catch(() => {});
+        await videoEl.play().catch(() => { });
         this.cameraActive.set(true);
       }
 
