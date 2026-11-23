@@ -871,7 +871,6 @@ public partial class MainWindow : Window
         HudStatusText.Text = message;
         HudPulseDot.Fill = BrushFromHex("#0A84FF");
         await Task.Delay(2600);
-        HudStatusText.Text = "SQLite Activo · Escuchando WalletPay y MarketStore";
         HudPulseDot.Fill = BrushFromHex("#30D158");
     }
 }
