@@ -806,12 +806,16 @@ export class MarketStateService {
     }
 
     try {
-      const data = await this.crypto.request('state.sync');
+      let data = await this.crypto.request('state.sync');
       if (!data?.ok) {
         if (data?.code === 'UNAUTHORIZED') {
-          this.lockSession('La sesión expiró en el Banco Central');
+          // Reconectar automáticamente en segundo plano sin cerrar la sesión del usuario
+          const reauthed = await this.trySilentReauth();
+          if (reauthed) {
+            data = await this.crypto.request('state.sync');
+          }
         }
-        return;
+        if (!data?.ok) return;
       }
 
       this.bankConnected.set(true);
@@ -860,7 +864,9 @@ export class MarketStateService {
         storeName: targetRole === 'seller' ? curr.storeName || `${curr.name} Oficial` : ''
       });
       if (data?.ok && data.user) {
-        this.currentUser.set({ ...curr, ...data.user, role: targetRole });
+        const nextUser: UserAccount = { ...curr, ...data.user, role: targetRole };
+        this.currentUser.set(nextUser);
+        this.savePersistedSession(nextUser);
         await this.syncWithCentralBank();
         this.router.navigateByUrl(targetRole === 'seller' ? '/seller' : '/catalog');
       }
@@ -870,6 +876,7 @@ export class MarketStateService {
   }
 
   lockSession(reason = 'Cambio de cuenta / Cierre de sesión'): void {
+    this.clearPersistedSession();
     this.crypto.request('auth.logout').catch(() => {});
     this.jwtToken = null;
     this.isAuthenticated.set(false);
@@ -888,12 +895,8 @@ export class MarketStateService {
   }
 
   resetInactivityWatchdog(): void {
+    // La sesión permanece abierta indefinidamente hasta que el usuario cierre sesión manualmente.
     if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
-    this.inactivityTimer = setTimeout(() => {
-      if (this.isAuthenticated()) {
-        this.lockSession('Caducidad automática tras 5 minutos de inactividad');
-      }
-    }, environment.sessionTimeoutMs);
   }
 
   // =========================================================================
@@ -1158,7 +1161,7 @@ export class MarketStateService {
     }
 
     if (onProgress) {
-      onProgress('Validando autenticidad de los tickets y enviando pedido al Banco Central...');
+      onProgress('Validando autenticidad de los tickets automáticamente con el Banco Central...');
     }
 
     let orderId = '';
@@ -1186,6 +1189,47 @@ export class MarketStateService {
         return { ok: false, error: reqData?.error || 'El Banco Central rechazó la solicitud.' };
       }
       orderId = reqData.orderId;
+
+      if (reqData.approvalStatus === 'approved' && reqData.receipt && reqData.order) {
+        const receiptOk = this.crypto.isOrderReceiptAuthentic(
+          reqData.receipt,
+          orderId,
+          subtotal,
+          selectedTicketIds,
+          user.email
+        );
+        if (!receiptOk) {
+          this.addAuditLog(
+            'warn',
+            `[Integridad] El comprobante de aprobación para la orden #${orderId} no superó la validación de autenticidad.`
+          );
+          return {
+            ok: false,
+            error: 'El comprobante de autorización recibido fue alterado y la tienda rechazó liberar la orden.'
+          };
+        }
+
+        await this.triggerBiometricPulse('Tickets Validados · Compra Aprobada', 850, 'checkmark.seal.fill');
+
+        this.products.update((prods) =>
+          prods.map((p) => {
+            const cartItem = items.find((i) => i.product.id === p.id);
+            if (!cartItem) return p;
+            return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
+          })
+        );
+
+        this.cart.set([]);
+        await this.syncWithCentralBank();
+
+        const approvedOrder: StoreOrder = reqData.order;
+        this.addAuditLog(
+          'bank',
+          `[Compra Validada Automáticamente] Orden #${orderId} por $${subtotal} MXN autorizada por el Banco Central con sello ${reqData.bankVerificationCode}.`
+        );
+        this.haptic('success');
+        return { ok: true, order: approvedOrder };
+      }
     } catch {
       return {
         ok: false,
@@ -1195,7 +1239,7 @@ export class MarketStateService {
 
     if (onProgress) {
       onProgress(
-        `Orden #${orderId} recibida en CentralBank · Esperando que el Administrador verifique los tickets y apruebe la compra...`
+        `Orden #${orderId} en verificación automática de tickets con el Banco Central...`
       );
     }
 
