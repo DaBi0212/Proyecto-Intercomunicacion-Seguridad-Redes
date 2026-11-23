@@ -364,6 +364,91 @@ export class MarketStateService {
     } catch {}
   }
 
+  private getLocalCardsStorageKey(email: string): string {
+    return `ms_account_cards_${(email || '').trim().toLowerCase()}`;
+  }
+
+  private loadLocalSavedCards(email: string): SavedUserCard[] {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) return [];
+    try {
+      const raw = localStorage.getItem(this.getLocalCardsStorageKey(clean));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  }
+
+  private saveLocalSavedCards(email: string, cards: SavedUserCard[]): void {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) return;
+    try {
+      localStorage.setItem(this.getLocalCardsStorageKey(clean), JSON.stringify(cards));
+    } catch {}
+  }
+
+  applySavedCardsFromServerOrLocal(email: string, serverCardsJson?: string): void {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) {
+      this.savedUserCards.set([]);
+      return;
+    }
+
+    let serverCards: SavedUserCard[] = [];
+    if (serverCardsJson && typeof serverCardsJson === 'string') {
+      try {
+        const parsed = JSON.parse(serverCardsJson);
+        if (Array.isArray(parsed)) {
+          serverCards = parsed;
+        }
+      } catch {}
+    }
+
+    const localCards = this.loadLocalSavedCards(clean);
+    if (serverCards.length > 0) {
+      this.savedUserCards.set(serverCards);
+      this.saveLocalSavedCards(clean, serverCards);
+    } else if (localCards.length > 0) {
+      this.savedUserCards.set(localCards);
+      this.crypto.request('user.cards.save', { cards: localCards }).catch(() => {});
+    } else {
+      this.savedUserCards.set([]);
+    }
+  }
+
+  async addOrUpdateUserCard(card: SavedUserCard): Promise<void> {
+    const user = this.currentUser();
+    const email = (user?.email || '').trim().toLowerCase();
+    const current = this.savedUserCards().filter(
+      (c) =>
+        c.id !== card.id &&
+        c.accountNumber.replace(/\D/g, '') !== card.accountNumber.replace(/\D/g, '')
+    );
+    const updated = [card, ...current];
+    this.savedUserCards.set(updated);
+    if (email) {
+      this.saveLocalSavedCards(email, updated);
+    }
+    try {
+      await this.crypto.request('user.cards.save', { cards: updated });
+    } catch {}
+  }
+
+  async removeUserCard(cardId: string): Promise<void> {
+    const user = this.currentUser();
+    const email = (user?.email || '').trim().toLowerCase();
+    const updated = this.savedUserCards().filter((c) => c.id !== cardId);
+    this.savedUserCards.set(updated);
+    if (email) {
+      this.saveLocalSavedCards(email, updated);
+    }
+    try {
+      await this.crypto.request('user.cards.save', { cards: updated });
+    } catch {}
+  }
+
   async saveBankConnectionUrl(rawUrl: string): Promise<{ ok: boolean; message: string }> {
     const norm = this.crypto.setCustomBankUrl(rawUrl);
     this.activeBankUrl.set(norm);
@@ -516,6 +601,7 @@ export class MarketStateService {
       this.currentUser.set(user);
       this.isAuthenticated.set(true);
       this.rememberLocalDeviceAccount(user);
+      this.applySavedCardsFromServerOrLocal(user.email, data.user?.savedCardsJson);
       if (Array.isArray(data.tickets)) this.tickets.set(this.filterAuthenticTickets(data.tickets));
       if (ticketId) {
         this.preselectedTicketIdFromWallet.set(ticketId);
@@ -611,6 +697,7 @@ export class MarketStateService {
       this.bankConnected.set(true);
       this.activeBankUrl.set(this.crypto.getActiveBankUrl());
       this.rememberLocalDeviceAccount(user);
+      this.applySavedCardsFromServerOrLocal(user.email, data.user?.savedCardsJson);
 
       if (Array.isArray(data.ticketRequests)) {
         this.ticketRequests.set(data.ticketRequests);
@@ -680,6 +767,7 @@ export class MarketStateService {
 
       if (data.user) {
         this.rememberLocalDeviceAccount({ ...data.user, role: user.role });
+        this.applySavedCardsFromServerOrLocal(user.email, data.user.savedCardsJson);
       }
       if (Array.isArray(data.ticketRequests)) {
         this.ticketRequests.set(data.ticketRequests);
