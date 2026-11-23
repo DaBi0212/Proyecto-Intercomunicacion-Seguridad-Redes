@@ -315,7 +315,57 @@ export class MarketStateService {
     });
     this.activeBankUrl.set(this.crypto.getCustomBankUrl());
     this.loadLocalDeviceAccounts();
+    this.restorePersistedSession();
     this.fetchRegisteredUsers();
+  }
+
+  private savePersistedSession(user: UserAccount): void {
+    try {
+      localStorage.setItem('ms_active_session_user_v2', JSON.stringify(user));
+    } catch {}
+  }
+
+  private clearPersistedSession(): void {
+    try {
+      localStorage.removeItem('ms_active_session_user_v2');
+    } catch {}
+  }
+
+  private restorePersistedSession(): void {
+    try {
+      const raw = localStorage.getItem('ms_active_session_user_v2');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as UserAccount;
+      if (!parsed || !parsed.email) return;
+      const cleanEmail = parsed.email.trim().toLowerCase();
+      this.currentUser.set({ ...parsed, email: cleanEmail });
+      this.applySavedCardsFromServerOrLocal(cleanEmail, parsed.savedCardsJson);
+      this.jwtToken = this.crypto.loadProtectedItem(`devpass_${cleanEmail}`) || 'session-active';
+      this.isAuthenticated.set(true);
+      this.startRealtimeBankSync();
+    } catch {}
+  }
+
+  private async trySilentReauth(): Promise<boolean> {
+    const user = this.currentUser();
+    if (!user || !user.email) return false;
+    const cleanEmail = user.email.trim().toLowerCase();
+    const deviceToken = this.crypto.loadProtectedItem(`devpass_${cleanEmail}`);
+    if (!deviceToken) return false;
+    try {
+      const data = await this.crypto.request('auth.biometric', {
+        email: cleanEmail,
+        deviceToken,
+        roleCode: user.role
+      });
+      if (data?.ok) {
+        if (data.deviceToken) {
+          this.crypto.saveProtectedItem(`devpass_${cleanEmail}`, data.deviceToken);
+        }
+        return true;
+      }
+    } catch {}
+    return false;
   }
 
   /**
@@ -600,6 +650,7 @@ export class MarketStateService {
       this.jwtToken = data.deviceToken || 'session-active';
       this.currentUser.set(user);
       this.isAuthenticated.set(true);
+      this.savePersistedSession(user);
       this.rememberLocalDeviceAccount(user);
       this.applySavedCardsFromServerOrLocal(user.email, data.user?.savedCardsJson);
       if (Array.isArray(data.tickets)) this.tickets.set(this.filterAuthenticTickets(data.tickets));
@@ -712,6 +763,7 @@ export class MarketStateService {
       this.jwtToken = data.deviceToken || 'session-active';
       this.currentUser.set(user);
       this.isAuthenticated.set(true);
+      this.savePersistedSession(user);
       this.resetInactivityWatchdog();
       this.startRealtimeBankSync();
 
