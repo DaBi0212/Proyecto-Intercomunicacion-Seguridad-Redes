@@ -17,7 +17,7 @@ import {
   IonSpinner
 } from '@ionic/angular/standalone';
 import { WalletStateService } from '../../core/services/wallet-state.service';
-import { TicketDenomination } from '../../core/models/wallet.models';
+import { SavedUserCard, TicketDenomination } from '../../core/models/wallet.models';
 import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 
 interface Denomination {
@@ -376,17 +376,38 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                   </p>
 
                   <div class="cf-actions">
-                    <button type="button" class="cf-cancel continuous apple-pressable" (click)="cancelAddCard()">
-                      Volver
-                    </button>
+                    @if (wallet.savedUserCards().length > 0) {
+                      <button type="button" class="cf-cancel continuous apple-pressable" (click)="cancelAddCard()">
+                        Volver
+                      </button>
+                    } @else {
+                      <button type="button" class="cf-cancel continuous apple-pressable" (click)="useSpeiWithoutCard()">
+                        Usar SPEI
+                      </button>
+                    }
                     <button type="button" class="cf-save continuous apple-pressable" (click)="saveCustomCard()">
                       <sf-symbol name="checkmark.circle.fill" [size]="18" />
-                      <span>Usar esta Tarjeta</span>
+                      <span>Guardar Tarjeta en mi Cuenta</span>
                     </button>
                   </div>
                 </div>
               } @else {
                 <ion-list [inset]="true">
+                  @if (wallet.savedUserCards().length === 0) {
+                    <ion-item button [detail]="false" (click)="openAddCardForm()">
+                      <span slot="start" class="method-icon" style="background: #204DC5">
+                        <sf-symbol name="creditcard" [size]="17" [weight]="2" />
+                      </span>
+                      <ion-label>
+                        <h3>Tarjeta de Débito o Crédito</h3>
+                        <p style="color: var(--ion-color-primary); font-weight: 600 !important;">
+                          Sin tarjeta vinculada · Toca para vincular tu número de cuenta
+                        </p>
+                      </ion-label>
+                      <sf-symbol slot="end" class="check" name="plus.circle.fill" [size]="20" />
+                    </ion-item>
+                  }
+
                   @for (m of allPaymentMethods(); track m.id) {
                     <ion-item button [detail]="false" (click)="selectMethod(m.id)">
                       <span slot="start" class="method-icon" [style.background]="m.tint">
@@ -404,7 +425,7 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                           slot="end"
                           type="button"
                           class="del-card-btn"
-                          title="Eliminar tarjeta"
+                          title="Eliminar tarjeta de la cuenta"
                           (click)="$event.stopPropagation(); removeCustomCard(m.id)"
                         >
                           <sf-symbol name="xmark" [size]="12" [weight]="2.4" />
@@ -412,15 +433,20 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                       }
                     </ion-item>
                   }
+
                   <ion-item button [detail]="false" (click)="openAddCardForm()">
                     <span slot="start" class="method-icon" style="background: #34C759">
                       <sf-symbol name="plus" [size]="17" [weight]="2.6" />
                     </span>
                     <ion-label>
                       <h3 style="color: var(--ion-color-primary); font-weight: 600 !important;">
-                        + Agregar mi propia tarjeta de Débito / Crédito
+                        {{
+                          wallet.savedUserCards().length === 0
+                            ? '+ Vincular Tarjeta de Débito / Crédito a mi Cuenta'
+                            : '+ Vincular otra Tarjeta de Débito / Crédito'
+                        }}
                       </h3>
-                      <p>Ingresa número de cuenta, vencimiento y CVC para validar en CentralBank</p>
+                      <p>El número de cuenta quedará guardado permanentemente en tu perfil</p>
                     </ion-label>
                   </ion-item>
                 </ion-list>
@@ -1248,34 +1274,20 @@ export class StorePage {
     }
   ];
 
-  readonly defaultMethods: PaymentMethod[] = [
-    {
-      id: 'Tarjeta Visa •••• 4821',
-      title: 'Tarjeta de Débito o Crédito',
-      sub: 'Visa •••• 4821 · Validación por Administrador Banco',
-      icon: 'creditcard',
-      tint: '#000000'
-    },
-    {
-      id: 'Tarjeta Mastercard •••• 8814',
-      title: 'Tarjeta Mastercard Oro',
-      sub: 'Mastercard •••• 8814 · Validación por Administrador Banco',
-      icon: 'creditcard.fill',
-      tint: '#EA580C'
-    },
-    {
-      id: 'Transferencia SPEI',
-      title: 'Transferencia SPEI',
-      sub: 'CLABE interbancaria · Validación Banco Central',
-      icon: 'building.columns',
-      tint: '#007AFF'
-    }
-  ];
+  readonly speiMethod: PaymentMethod = {
+    id: 'Transferencia SPEI',
+    title: 'Transferencia SPEI',
+    sub: 'CLABE interbancaria · Validación Banco Central',
+    icon: 'building.columns',
+    tint: '#007AFF'
+  };
 
-  readonly customCards = signal<PaymentMethod[]>(this.loadSavedCustomCards());
   readonly allPaymentMethods = computed<PaymentMethod[]>(() => [
-    ...this.customCards(),
-    ...this.defaultMethods
+    ...this.wallet.savedUserCards().map((c) => ({
+      ...c,
+      isCustom: true
+    })),
+    this.speiMethod
   ]);
 
   newCardNumber = '';
@@ -1286,7 +1298,7 @@ export class StorePage {
 
   readonly sheetOpen = signal(false);
   readonly selected = signal<Denomination | null>(null);
-  readonly payment = signal('Tarjeta Visa •••• 4821');
+  readonly payment = signal('');
   readonly state = signal<SheetState>('idle');
   readonly approvalProgressText = signal('Enviando solicitud de pago al Banco Central...');
   readonly currentRequestId = signal('');
@@ -1294,24 +1306,6 @@ export class StorePage {
   private cancelWaitingFlag = false;
 
   readonly payLabel = computed(() => 'Solicitar Aprobación del Banco Central');
-
-  private loadSavedCustomCards(): PaymentMethod[] {
-    try {
-      const raw = localStorage.getItem('wp_custom_user_cards_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  }
-
-  private persistCustomCards(list: PaymentMethod[]): void {
-    this.customCards.set(list);
-    try {
-      localStorage.setItem('wp_custom_user_cards_v1', JSON.stringify(list));
-    } catch {}
-  }
 
   previewCardBrand(): { name: string; tint: string; gradient: string } {
     const digits = this.newCardNumber.replace(/\D/g, '');
@@ -1373,7 +1367,13 @@ export class StorePage {
     this.state.set('idle');
   }
 
-  saveCustomCard(): void {
+  useSpeiWithoutCard(): void {
+    this.wallet.haptic('selection');
+    this.payment.set(this.speiMethod.id);
+    this.state.set('idle');
+  }
+
+  async saveCustomCard(): Promise<void> {
     const digits = this.newCardNumber.replace(/\D/g, '');
     if (digits.length < 12) {
       this.cardFormError.set('Ingresa al menos 12 a 16 dígitos del número de tarjeta o cuenta.');
@@ -1394,46 +1394,51 @@ export class StorePage {
     }
 
     const brand = this.previewCardBrand();
-    const last4 = digits.slice(-4);
     const formattedNum = (digits.match(/.{1,4}/g) || [digits]).join(' ');
-    // Este ID viaja a CentralBank Desktop para que el Administrador vea la tarjeta, vencimiento y CVC
+    // Este ID viaja a CentralBank Desktop y permanece visible en la cuenta del usuario
     const methodId = `${brand.name} (${formattedNum} · Vence ${exp} · CVC ${cvc})`;
 
-    const newMethod: PaymentMethod = {
+    const newCard: SavedUserCard = {
       id: methodId,
-      title: `${brand.name} •••• ${last4}`,
-      sub: `Cuenta ${formattedNum} · Vence ${exp} · CVC ${cvc}`,
+      title: `${brand.name} · ${formattedNum}`,
+      sub: `Cuenta vinculada · Vence ${exp} · CVC ${cvc}`,
       icon: 'creditcard.fill',
       tint: brand.tint,
-      isCustom: true,
       fullCardNumber: formattedNum,
       expiry: exp,
-      cvc
+      cvc,
+      alias: this.newCardAlias.trim() || brand.name
     };
 
-    const updated = [newMethod, ...this.customCards().filter((c) => c.id !== methodId)];
-    this.persistCustomCards(updated);
+    await this.wallet.addOrUpdateUserCard(newCard);
     this.payment.set(methodId);
     this.wallet.haptic('success');
     this.state.set('idle');
   }
 
-  removeCustomCard(id: string): void {
+  async removeCustomCard(id: string): Promise<void> {
     this.wallet.haptic('light');
-    const updated = this.customCards().filter((c) => c.id !== id);
-    this.persistCustomCards(updated);
+    await this.wallet.removeUserCard(id);
+    const remaining = this.wallet.savedUserCards();
     if (this.payment() === id) {
-      this.payment.set(updated[0]?.id || this.defaultMethods[0].id);
+      this.payment.set(remaining[0]?.id || '');
     }
   }
 
   open(d: Denomination): void {
     this.wallet.haptic('light');
     this.selected.set(d);
-    this.state.set('idle');
     this.cancelWaitingFlag = false;
-    if (this.customCards().length > 0 && !this.allPaymentMethods().some((m) => m.id === this.payment())) {
-      this.payment.set(this.customCards()[0].id);
+    const saved = this.wallet.savedUserCards();
+    if (saved.length === 0) {
+      // Si el usuario aún no tiene ninguna tarjeta vinculada a su cuenta, pedirle que agregue su tarjeta primero
+      this.payment.set('');
+      this.openAddCardForm();
+    } else {
+      this.state.set('idle');
+      if (!this.allPaymentMethods().some((m) => m.id === this.payment())) {
+        this.payment.set(saved[0].id);
+      }
     }
     this.sheetOpen.set(true);
   }
@@ -1451,6 +1456,12 @@ export class StorePage {
   async confirm(): Promise<void> {
     const d = this.selected();
     if (!d || this.state() === 'waiting_approval') return;
+
+    // Si intenta pagar con tarjeta pero aún no tiene ninguna tarjeta vinculada ni seleccionó SPEI, abrir formulario para vincular su tarjeta
+    if (!this.payment() || (this.payment() !== this.speiMethod.id && this.wallet.savedUserCards().length === 0)) {
+      this.openAddCardForm();
+      return;
+    }
 
     this.cancelWaitingFlag = false;
     this.currentRequestId.set('');
