@@ -209,6 +209,7 @@ public class CentralBankStateService
             TryAlterColumn(conn, "ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT '';");
             TryAlterColumn(conn, "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'buyer';");
             TryAlterColumn(conn, "ALTER TABLE users ADD COLUMN store_name TEXT NOT NULL DEFAULT '';");
+            TryAlterColumn(conn, "ALTER TABLE users ADD COLUMN saved_cards_json TEXT NOT NULL DEFAULT '[]';");
             TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN signature TEXT NOT NULL DEFAULT '';");
             TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN shared_with_emails TEXT NOT NULL DEFAULT '';");
             TryAlterColumn(conn, "ALTER TABLE tickets ADD COLUMN used_by_email TEXT;");
@@ -377,7 +378,7 @@ public class CentralBankStateService
             var users = new List<BankUser>();
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT id, name, email, role_label, verified_level, avatar_initials, avatar_hex, store_credit, password, role, store_name FROM users;";
+                cmd.CommandText = "SELECT id, name, email, role_label, verified_level, avatar_initials, avatar_hex, store_credit, password, role, store_name, saved_cards_json FROM users;";
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
@@ -393,7 +394,8 @@ public class CentralBankStateService
                         StoreCredit = (decimal)r.GetDouble(7),
                         Password = r.IsDBNull(8) ? "" : r.GetString(8),
                         Role = r.IsDBNull(9) ? "buyer" : r.GetString(9),
-                        StoreName = r.IsDBNull(10) ? "" : r.GetString(10)
+                        StoreName = r.IsDBNull(10) ? "" : r.GetString(10),
+                        SavedCardsJson = r.IsDBNull(11) ? "[]" : r.GetString(11)
                     });
                 }
             }

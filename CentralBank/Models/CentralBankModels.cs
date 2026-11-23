@@ -29,6 +29,7 @@ public class BankUser
     public string AvatarInitials { get; set; } = string.Empty;
     public string AvatarHex { get; set; } = "#007AFF";
     public decimal StoreCredit { get; set; }
+    public string SavedCardsJson { get; set; } = "[]";
 
     // Estadísticas calculadas en tiempo real desde la base de datos SQLite
     public int TotalTicketsPurchased { get; set; }
