@@ -94,7 +94,61 @@ export class WalletStateService {
     this.activeBankUrl.set(this.crypto.getCustomBankUrl());
     this.activeStoreUrl.set(this.crypto.getMarketStoreUrl());
     this.loadLocalDeviceAccounts();
+    this.restorePersistedSession();
     this.fetchRegisteredUsers();
+  }
+
+  private savePersistedSession(email: string, name: string): void {
+    try {
+      localStorage.setItem('wp_active_session_user_v2', JSON.stringify({ email, name }));
+    } catch {}
+  }
+
+  private clearPersistedSession(): void {
+    try {
+      localStorage.removeItem('wp_active_session_user_v2');
+    } catch {}
+  }
+
+  private restorePersistedSession(): void {
+    try {
+      const raw = localStorage.getItem('wp_active_session_user_v2');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const email = (parsed?.email || '').trim().toLowerCase();
+      if (!email) return;
+      const name = (parsed?.name || '').trim() || email.split('@')[0];
+      this.currentUserEmail.set(email);
+      this.currentUserName.set(name);
+      this.loadAccountCards(email);
+      this.jwtToken = this.crypto.loadProtectedItem(`devpass_${email}`) || 'session-active';
+      this.isAuthenticated.set(true);
+      this.startRealtimeBankSync();
+      if (this.router.url === '/' || this.router.url.startsWith('/auth')) {
+        this.router.navigateByUrl('/tabs/store');
+      }
+    } catch {}
+  }
+
+  private async trySilentReauth(): Promise<boolean> {
+    const email = (this.currentUserEmail() || '').trim().toLowerCase();
+    if (!email) return false;
+    const deviceToken = this.crypto.loadProtectedItem(`devpass_${email}`);
+    if (!deviceToken) return false;
+    try {
+      const data = await this.crypto.request('auth.biometric', {
+        email,
+        deviceToken,
+        roleCode: 'buyer'
+      });
+      if (data?.ok) {
+        if (data.deviceToken) {
+          this.crypto.saveProtectedItem(`devpass_${email}`, data.deviceToken);
+        }
+        return true;
+      }
+    } catch {}
+    return false;
   }
 
   /**
@@ -401,6 +455,7 @@ export class WalletStateService {
       await this.triggerBiometricPulse(`Hola, ${resolvedName.split(' ')[0]}`, 850);
       this.jwtToken = data.deviceToken || 'session-active';
       this.isAuthenticated.set(true);
+      this.savePersistedSession(email, resolvedName);
       this.resetInactivityWatchdog();
       this.startRealtimeBankSync();
       this.addAuditLog('sec', `[Acceso] Sesión verificada para ${resolvedName} (${email}).`);
