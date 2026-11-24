@@ -356,8 +356,44 @@ interface DenominationCard {
     /* Passes Grid (1:1 con WalletPay) */
     .passes-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(306px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+      gap: 18px;
+    }
+
+    @media (max-width: 640px) {
+      .page-container {
+        padding: 14px 12px calc(env(safe-area-inset-bottom, 0px) + 86px);
+        gap: 16px;
+      }
+      .page-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .ios-segmented {
+        width: 100%;
+      }
+      .ios-segment-btn {
+        flex: 1;
+      }
+      .balance-strip {
+        padding: 16px 14px;
+      }
+      .bs-amount {
+        font-size: 28px;
+      }
+      .folio-import-bar {
+        flex-wrap: wrap;
+      }
+      .folio-in {
+        flex: 1 1 100%;
+      }
+      .folio-sel {
+        flex: 1;
+      }
+      .folio-submit {
+        flex: 1;
+        justify-content: center;
+      }
     }
 
     .pass,

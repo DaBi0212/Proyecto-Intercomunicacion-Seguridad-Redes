@@ -13,10 +13,6 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       <!-- Barra superior minimalista con estado de conexión automática al Banco Central y control de tema -->
       <header class="auth-topbar">
         <div class="topbar-left">
-          <div class="topbar-badge continuous">
-            <sf-symbol name="shield.checkered" [size]="15" />
-            <span>Multi-Usuario · Verificación Bancaria en Vivo</span>
-          </div>
 
           <div
             class="topbar-badge net-btn continuous"
@@ -44,78 +40,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       </header>
 
       <main class="auth-grid">
-        <!-- Columna izquierda (en Desktop): Contexto del Ecosistema MarketStore + WalletPay -->
-        <section class="ecosystem-showcase continuous">
-          <div class="eco-brand-banner continuous">
-            <img
-              src="assets/logos/marketstore-horizontal.png"
-              alt="Market Store"
-              class="eco-horizontal-logo"
-            />
-            <span class="eco-official-tag">TIENDA OFICIAL · COLECCIONES</span>
-          </div>
-
-          <div class="eco-header">
-            <span class="eco-eyebrow">EXPERIENCIA DE COMPRA · RED WALLETPAY</span>
-            <h2>Explora nuestras colecciones y paga al instante con tus Tickets del Banco Central.</h2>
-            <p>
-              Ingresa con tu cuenta de <strong>WalletPay</strong> para explorar lanzamientos, filtrar por silueta de ticket
-              y liquidar tus pedidos con validación automática del Banco Central.
-            </p>
-          </div>
-
-          <!-- Previsualización de los 4 niveles de Tickets Oficiales (Consistencia 1:1 con WalletPay) -->
-          <div class="tickets-fan" aria-hidden="true">
-            <div class="fan-card card-tier-50 continuous">
-              <span>BANCO CENTRAL · ESTÁNDAR</span>
-              <strong>$50<small>.00</small></strong>
-            </div>
-            <div class="fan-card card-tier-100 continuous">
-              <span>BANCO CENTRAL · PLATA</span>
-              <strong>$100<small>.00</small></strong>
-            </div>
-            <div class="fan-card card-tier-200 continuous">
-              <span>BANCO CENTRAL · ORO</span>
-              <strong>$200<small>.00</small></strong>
-            </div>
-            <div class="fan-card card-tier-500 continuous">
-              <span>BANCO CENTRAL · TITANIUM</span>
-              <strong>$500<small>.00</small></strong>
-            </div>
-          </div>
-
-          <div class="eco-steps">
-            <div class="eco-step">
-              <span class="step-icon continuous">
-                <sf-symbol name="wallet.pass" [size]="18" />
-              </span>
-              <div>
-                <strong>1. Adquiere Tickets en tu Cuenta WalletPay</strong>
-                <span>Cada usuario compra sus certificados de $50, $100, $200 y $500 MXN.</span>
-              </div>
-            </div>
-            <div class="eco-step">
-              <span class="step-icon continuous">
-                <sf-symbol name="storefront" [size]="18" />
-              </span>
-              <div>
-                <strong>2. Elige Productos en MarketStore</strong>
-                <span>Accede como Comprador o Vendedor con aislamiento completo por usuario.</span>
-              </div>
-            </div>
-            <div class="eco-step">
-              <span class="step-icon continuous">
-                <sf-symbol name="checkmark.seal.fill" [size]="18" />
-              </span>
-              <div>
-                <strong>3. Validación Automática con CentralBank</strong>
-                <span>El Banco Central verifica automáticamente la validez de tus tickets al comprar.</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Columna derecha: Tarjeta de Control de Acceso Multi-Usuario tipo iOS -->
+        <!-- Tarjeta de Control de Acceso Multi-Usuario tipo iOS -->
         <section class="auth-card continuous">
           <div class="brand">
             <div class="app-icon-logo continuous" aria-hidden="true">
@@ -307,34 +232,38 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
     }
 
     .auth-topbar {
-      max-width: 1120px;
+      max-width: 480px;
       width: 100%;
       margin: 0 auto 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      flex-wrap: wrap;
     }
 
     .topbar-left {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
+      min-width: 0;
+      flex: 1;
     }
 
     .topbar-badge {
       --r: 999px;
-      padding: 6px 13px;
+      padding: 6px 12px;
       background: var(--ios-cell);
       color: var(--ios-label-2);
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       border: 0;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .net-btn {
       cursor: pointer;
@@ -439,13 +368,11 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
     }
 
     .auth-grid {
-      max-width: 1120px;
+      max-width: 460px;
       width: 100%;
       margin: auto;
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 28px;
-      align-items: stretch;
+      display: flex;
+      flex-direction: column;
     }
 
     .ecosystem-showcase {
@@ -857,17 +784,17 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       color: var(--ios-label-2);
     }
 
-    @media (max-width: 920px) {
-      .auth-grid {
-        grid-template-columns: 1fr;
-        max-width: 480px;
+    @media (max-width: 520px) {
+      .auth-page {
+        padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 20px);
       }
-      .ecosystem-showcase {
-        order: 2;
-        padding: 24px;
+      .auth-card {
+        padding: 22px 16px;
       }
-      .tickets-fan {
-        grid-template-columns: repeat(2, 1fr);
+      .sub-links {
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
       }
     }
   `]

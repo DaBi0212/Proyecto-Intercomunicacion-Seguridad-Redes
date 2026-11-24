@@ -8,19 +8,6 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 
 type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
 
-interface HeroSlide {
-  id: string;
-  tag: string;
-  title: string;
-  subtitle: string;
-  ctaLabel: string;
-  category: ProductCategory;
-  denomFilter: TicketDenomination | null;
-  ticketPreviewAmount: TicketDenomination;
-  ticketPreviewTier: string;
-  ticketPreviewClass: string;
-}
-
 @Component({
   selector: 'app-catalog',
   standalone: true,
@@ -28,245 +15,148 @@ interface HeroSlide {
   template: `
     <div class="ne-storefront">
       <!-- ==========================================================================
-           1. HERO CAMPAIGN SHOWCASE ESTILO NEW ERA MX (NEWERA.MX) CON ESTÉTICA iOS
-           Incluye las 2 variantes del logo oficial de Market Store + Selector de Drops
+           1. PÍLDORAS RÁPIDAS DE COLECCIÓN (DESLIZABLES EN MÓVIL Y ESCRITORIO)
            ========================================================================== -->
-      <section class="ne-hero-wrap">
-        @let slide = activeHeroSlide();
-        <div class="ne-hero-banner continuous">
-          <div class="ne-hero-left">
-            <div class="ne-hero-brand-row">
-              <!-- Variante 1 del Logo: Horizontal Market Store -->
-              <img
-                src="assets/logos/marketstore-horizontal.png"
-                alt="Market Store"
-                class="ne-hero-logo-h"
-              />
-              <span class="ne-drop-pill">{{ slide.tag }}</span>
-            </div>
-
-            <h1>{{ slide.title }}</h1>
-            <p>{{ slide.subtitle }}</p>
-
-            <div class="ne-hero-ctas">
-              <button
-                type="button"
-                class="ne-btn-primary continuous apple-pressable"
-                (click)="applyHeroSlideFilter(slide)"
-              >
-                <span>{{ slide.ctaLabel }}</span>
-                <sf-symbol name="arrow.up.right" [size]="15" [weight]="2.4" />
-              </button>
-
-              <button
-                type="button"
-                class="ne-btn-glass continuous apple-pressable"
-                (click)="goToWallet()"
-              >
-                <sf-symbol name="wallet.pass" [size]="17" [weight]="2" />
-                <span>Mis Tickets WalletPay ({{ market.activeTickets().length }})</span>
-              </button>
-            </div>
-
-            <!-- Tabs de campañas tipo New Era MX (01 / 02 / 03) -->
-            <div class="ne-hero-tabs" role="tablist">
-              @for (s of heroSlides; track s.id; let idx = $index) {
-                <button
-                  type="button"
-                  class="ne-hero-tab apple-pressable"
-                  [class.active]="heroSlideIndex() === idx"
-                  (click)="selectHeroSlide(idx)"
-                >
-                  <span class="nht-num">0{{ idx + 1 }}</span>
-                  <span class="nht-lbl">{{ s.tag }}</span>
-                </button>
-              }
-            </div>
-          </div>
-
-          <!-- Derecha del Hero: Escaparate Visual + Bóveda WalletPay + Variante 2 del Logo -->
-          <div class="ne-hero-right">
-            <div class="ne-floating-ticket continuous" [class]="'ne-floating-ticket continuous ' + slide.ticketPreviewClass">
-              <div class="nft-head">
-                <span class="nft-issuer">
-                  <sf-symbol name="building.columns" [size]="12" [weight]="2.2" />
-                  BANCO CENTRAL · {{ slide.ticketPreviewTier }}
-                </span>
-                <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nft-brand-mark" />
-              </div>
-              <div class="nft-val">
-                <span class="cur">$</span>{{ slide.ticketPreviewAmount }}<span class="dec">.00</span>
-                <small>MXN</small>
-              </div>
-              <div class="nft-foot">
-                <span class="mono">CERTIFICADO OFICIAL · CANJE AUTOMÁTICO</span>
-                <span class="nft-chip"></span>
-              </div>
-            </div>
-
-            <!-- Tarjeta iOS de Poder de Compra sincronizado con WalletPay -->
-            <div class="ne-hero-vault continuous">
-              <div class="nhv-head">
-                <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nhv-icon" />
-                <div>
-                  <span class="nhv-eyebrow">PODER DE COMPRA WALLETPAY</span>
-                  <strong class="nhv-total">
-                    {{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} <small>MXN</small>
-                  </strong>
-                </div>
-              </div>
-
-              <div class="nhv-chips">
-                @for (t of market.activeTickets().slice(0, 4); track t.id) {
-                  <span class="nhv-chip continuous" [class]="'nhv-chip continuous ' + t.colorClass">
-                    {{ '$' + t.amount }}
-                  </span>
-                }
-                @if (market.activeTickets().length === 0) {
-                  <span class="nhv-empty">Adquiere tickets en la app WalletPay</span>
-                }
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==========================================================================
-           2. "COMPRA POR COLECCIÓN Y SILUETA DE TICKET" (ESTILO NEW ERA MX)
-           ========================================================================== -->
-      <section class="ne-collections-strip">
-        <div class="ncs-header">
-          <div>
-            <span class="ncs-eyebrow">NAVEGACIÓN RÁPIDA · ESTILO NEW ERA</span>
-            <h2>EXPLORA POR COLECCIÓN O SILUETA DE TICKET</h2>
-          </div>
-          <div class="ncs-ticket-silhouettes">
-            <span class="nts-label">FILTRAR POR TICKET:</span>
-            <button
-              type="button"
-              class="nts-pill continuous apple-pressable"
-              [class.active]="selectedDenom() === null"
-              (click)="selectDenom(null)"
-            >
-              Todos
-            </button>
-            @for (d of ticketDenominations; track d.amount) {
-              <button
-                type="button"
-                class="nts-pill continuous apple-pressable"
-                [class.active]="selectedDenom() === d.amount"
-                (click)="selectDenom(d.amount)"
-              >
-                <span>Ticket {{ '$' + d.amount }}</span>
-                <small>{{ d.name }}</small>
-              </button>
-            }
-          </div>
-        </div>
-
-        <!-- Tarjetas Visuales de Colección (Grid horizontal New Era) -->
-        <div class="ne-cat-cards">
-          @for (cat of categories; track cat.id) {
-            <button
-              type="button"
-              class="ne-cat-card continuous apple-pressable"
-              [class.active]="selectedCategory() === cat.id"
-              (click)="selectCategory(cat.id)"
-            >
-              <div class="ncc-top">
-                <span class="ncc-icon">
-                  <sf-symbol [name]="cat.icon" [size]="20" />
-                </span>
-                <span class="ncc-count">{{ getCategoryCount(cat.id) }}</span>
-              </div>
-              <div class="ncc-bottom">
-                <strong>{{ cat.label }}</strong>
-                <span>{{ cat.code }}</span>
-              </div>
-            </button>
-          }
-        </div>
-      </section>
-
-      <!-- ==========================================================================
-           3. BARRA SUPERIOR DE COLECCIÓN (BREADCRUMB + FILTROS + ORDENAR POR + COLUMNAS)
-           ========================================================================== -->
-      <section class="ne-toolbar continuous">
-        <div class="ntb-left">
+      <div class="ne-categories-scroll" role="tablist" aria-label="Colecciones Market Store">
+        @for (cat of categories; track cat.id) {
           <button
             type="button"
-            class="ntb-filter-btn continuous apple-pressable"
-            [class.active]="sidebarOpen()"
-            (click)="sidebarOpen.set(!sidebarOpen())"
+            role="tab"
+            class="ne-cat-pill continuous apple-pressable"
+            [class.active]="selectedCategory() === cat.id"
+            (click)="selectCategory(cat.id)"
           >
-            <sf-symbol name="line.3.horizontal" [size]="15" [weight]="2.2" />
-            <span>{{ sidebarOpen() ? 'OCULTAR FILTROS' : 'MOSTRAR FILTROS' }}</span>
+            <sf-symbol [name]="cat.icon" [size]="14" />
+            <span>{{ cat.label }}</span>
           </button>
-
-          <div class="ntb-breadcrumb">
-            <span>MARKET STORE</span>
-            <span>/</span>
-            <strong>{{ activeCategoryLabel() }}</strong>
-            <span class="ntb-count">({{ filteredProducts().length }} productos)</span>
-          </div>
-        </div>
-
-        <div class="ntb-right">
-          @if (hasActiveFilters()) {
-            <button type="button" class="ntb-clear apple-pressable" (click)="resetFilters()">
-              <sf-symbol name="xmark" [size]="11" [weight]="2.6" />
-              <span>Limpiar filtros</span>
-            </button>
-          }
-
-          <label class="ntb-sort">
-            <span>ORDENAR POR:</span>
-            <select [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
-              <option value="featured">Destacados / Lanzamientos</option>
-              <option value="price-asc">Precio: Menor a Mayor</option>
-              <option value="price-desc">Precio: Mayor a Menor</option>
-              <option value="rating">Mejor Calificados</option>
-            </select>
-          </label>
-
-          <div class="ntb-grid-toggle" aria-label="Densidad de cuadrícula">
-            <button
-              type="button"
-              [class.active]="denseGrid() === false"
-              (click)="denseGrid.set(false)"
-              title="Vista 3 columnas"
-            >
-              3×
-            </button>
-            <button
-              type="button"
-              [class.active]="denseGrid() === true"
-              (click)="denseGrid.set(true)"
-              title="Vista 4 columnas"
-            >
-              4×
-            </button>
-          </div>
-        </div>
-      </section>
+        }
+      </div>
 
       <!-- ==========================================================================
-           4. WORKSPACE DE 2 COLUMNAS ESTILO NEW ERA MX:
-              SIDEBAR LATERAL DE FILTROS (IZQUIERDA) + GRID DE PRODUCTOS (DERECHA)
+           2. ENCABEZADO CENTRADO + BARRA "FILTRAR | X PRODUCTOS | [2x2] [1x1]"
+              (DISPOSICIÓN Y ORGANIZACIÓN 1:1 CON LA IMAGEN DE REFERENCIA DE NEW ERA)
            ========================================================================== -->
-      <div class="ne-catalog-workspace" [class.no-sidebar]="!sidebarOpen()">
-        @if (sidebarOpen()) {
-          <aside class="ne-filter-sidebar continuous" aria-label="Filtros de colección">
-            <!-- Sello de Marca Oficial en el Sidebar -->
-            <div class="nfs-brand-card continuous">
-              <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nfs-brand-icon" />
-              <div>
-                <strong>MARKET STORE</strong>
-                <span>Validación Automática Banco Central</span>
+      <header class="ne-collection-header">
+        <h1 class="ne-collection-title">{{ activeCategoryTitle() }}</h1>
+
+        <div class="ne-control-bar">
+          <!-- Izquierda: Botón Filtrar con icono de controles deslizantes -->
+          <button
+            type="button"
+            class="ne-filter-trigger apple-pressable"
+            [class.active]="filterDrawerOpen() || hasActiveFilters()"
+            (click)="filterDrawerOpen.update((v) => !v)"
+          >
+            <svg class="ne-sliders-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <circle cx="9" cy="7" r="2.3" fill="var(--ion-background-color)" />
+              <line x1="4" y1="17" x2="20" y2="17" />
+              <circle cx="15" cy="17" r="2.3" fill="var(--ion-background-color)" />
+            </svg>
+            <span>Filtrar</span>
+            @if (activeFiltersCount() > 0) {
+              <span class="ne-filter-count">{{ activeFiltersCount() }}</span>
+            }
+          </button>
+
+          <!-- Centro: Contador de productos -->
+          <span class="ne-products-count">{{ filteredProducts().length }} productos</span>
+
+          <!-- Derecha: Selector de vista Cuadrícula (2x2) vs Columna única (1x1) idéntico a la imagen -->
+          <div class="ne-view-switcher" role="group" aria-label="Cambiar disposición de cuadrícula">
+            <button
+              type="button"
+              class="ne-view-btn apple-pressable"
+              [class.active]="gridMode() === 'multi'"
+              (click)="gridMode.set('multi')"
+              aria-label="Vista de 2 columnas en móvil y 4 en escritorio"
+              title="Vista cuadrícula"
+            >
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7">
+                <rect x="2.5" y="2.5" width="6" height="6" rx="1" />
+                <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
+                <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
+                <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="ne-view-btn apple-pressable"
+              [class.active]="gridMode() === 'single'"
+              (click)="gridMode.set('single')"
+              aria-label="Vista de 1 columna amplia"
+              title="Vista ampliada"
+            >
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7">
+                <rect x="2.5" y="2.5" width="15" height="15" rx="1.4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chips de filtros activos (si el usuario aplicó algún filtro) -->
+        @if (hasActiveFilters()) {
+          <div class="ne-active-chips">
+            @if (onlyAffordable()) {
+              <button type="button" class="ne-chip continuous" (click)="toggleAffordable()">
+                <span>Alcanza con mi saldo ({{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }})</span>
+                <sf-symbol name="xmark" [size]="10" [weight]="2.6" />
+              </button>
+            }
+            @if (selectedDenom(); as d) {
+              <button type="button" class="ne-chip continuous" (click)="selectDenom(null)">
+                <span>Ticket {{ '$' + d }} MXN</span>
+                <sf-symbol name="xmark" [size]="10" [weight]="2.6" />
+              </button>
+            }
+            @if (onlyInStock()) {
+              <button type="button" class="ne-chip continuous" (click)="onlyInStock.set(false)">
+                <span>En existencia</span>
+                <sf-symbol name="xmark" [size]="10" [weight]="2.6" />
+              </button>
+            }
+            <button type="button" class="ne-chip-reset" (click)="resetFilters()">
+              Limpiar todo
+            </button>
+          </div>
+        }
+      </header>
+
+      <!-- ==========================================================================
+           3. DRAWER / SHEET DESPLEGABLE DE FILTROS Y ORDENAMIENTO (ESTILO iOS + NEW ERA)
+           ========================================================================== -->
+      @if (filterDrawerOpen()) {
+        <div class="modal-scrim" (click)="filterDrawerOpen.set(false)" role="presentation"></div>
+        <aside class="ne-filter-drawer continuous" role="dialog" aria-modal="true" aria-label="Filtros y ordenamiento">
+          <div class="nfd-head">
+            <div class="nfd-title-row">
+              <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nfd-logo" />
+              <strong>Filtrar y Ordenar</strong>
+            </div>
+            <button type="button" class="sheet-close apple-pressable" (click)="filterDrawerOpen.set(false)">
+              <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+            </button>
+          </div>
+
+          <div class="nfd-body">
+            <!-- Ordenar por -->
+            <div class="nfs-group">
+              <div class="nfs-group-title">ORDENAR POR</div>
+              <div class="nfs-sort-grid">
+                @for (opt of sortOptions; track opt.id) {
+                  <button
+                    type="button"
+                    class="nfs-sort-btn continuous apple-pressable"
+                    [class.selected]="sortBy() === opt.id"
+                    (click)="sortBy.set(opt.id)"
+                  >
+                    <span>{{ opt.label }}</span>
+                  </button>
+                }
               </div>
             </div>
 
-            <!-- Filtro 1: Poder de Compra WalletPay -->
+            <!-- Poder de compra WalletPay -->
             <div class="nfs-group">
               <div class="nfs-group-title">PODER DE COMPRA WALLETPAY</div>
               <button
@@ -277,7 +167,7 @@ interface HeroSlide {
               >
                 <div class="nat-copy">
                   <strong>Alcanza con mis tickets</strong>
-                  <span>Saldo actual: {{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</span>
+                  <span>Saldo disponible: {{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</span>
                 </div>
                 <span class="ios-switch" [class.on]="onlyAffordable()">
                   <span class="ios-knob"></span>
@@ -285,7 +175,7 @@ interface HeroSlide {
               </button>
             </div>
 
-            <!-- Filtro 2: Colecciones -->
+            <!-- Colección -->
             <div class="nfs-group">
               <div class="nfs-group-title">COLECCIÓN</div>
               <div class="nfs-list">
@@ -304,9 +194,9 @@ interface HeroSlide {
               </div>
             </div>
 
-            <!-- Filtro 3: Silueta / Denominación de Ticket -->
+            <!-- Silueta de Ticket -->
             <div class="nfs-group">
-              <div class="nfs-group-title">SILUETA DE TICKET RECOMENDADO</div>
+              <div class="nfs-group-title">DENOMINACIÓN DE TICKET</div>
               <div class="nfs-denom-grid">
                 @for (d of ticketDenominations; track d.amount) {
                   <button
@@ -322,7 +212,7 @@ interface HeroSlide {
               </div>
             </div>
 
-            <!-- Filtro 4: Disponibilidad -->
+            <!-- Disponibilidad -->
             <div class="nfs-group">
               <div class="nfs-group-title">DISPONIBILIDAD</div>
               <button
@@ -332,127 +222,101 @@ interface HeroSlide {
                 (click)="onlyInStock.set(!onlyInStock())"
               >
                 <span class="nfs-radio" [class.checked]="onlyInStock()"></span>
-                <span class="nfs-lbl">Solo en existencia inmediata</span>
+                <span class="nfs-lbl">Solo productos en existencia</span>
               </button>
             </div>
-          </aside>
-        }
+          </div>
 
-        <!-- GRID DE PRODUCTOS ESTILO NEW ERA MX CON ACABADO iOS -->
-        <div class="ne-products-area">
-          @if (filteredProducts().length === 0) {
-            <div class="ne-empty-state continuous">
-              <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nes-logo" />
-              <h3>No encontramos artículos con esos filtros</h3>
-              <p>Prueba seleccionando otra colección, otra denominación de ticket o restablece los filtros.</p>
-              <button type="button" class="ne-btn-primary continuous apple-pressable" (click)="resetFilters()">
-                Ver toda la colección Market Store
-              </button>
-            </div>
-          } @else {
-            <div class="ne-product-grid" [class.dense]="denseGrid()">
-              @for (p of filteredProducts(); track p.id) {
-                <article class="ne-product-card continuous">
-                  <!-- Zona Visual Superior estilo New Era MX -->
-                  <div
-                    class="npc-visual continuous apple-pressable"
-                    [class]="'npc-visual continuous apple-pressable ' + p.surfaceClass"
-                    (click)="openDetail(p)"
-                  >
-                    <div class="npc-top-badges">
-                      <span class="npc-ticket-badge">
-                        <sf-symbol name="ticket" [size]="11" [weight]="2.3" />
-                        {{ p.badge }}
-                      </span>
-                      <!-- Variante 2 del Logo como sello oficial de autenticidad en cada tarjeta -->
-                      <span class="npc-brand-seal" title="Producto Oficial Market Store">
-                        <img src="assets/logos/marketstore-icon.png" alt="Market Store" />
-                      </span>
-                    </div>
-
-                    <div class="npc-art" [style.color]="p.accentColor">
-                      <sf-symbol [name]="p.symbolName" [size]="60" [weight]="1.55" />
-                    </div>
-
-                    <div class="npc-bottom-meta">
-                      <span class="npc-sku mono">{{ p.sku }}</span>
-                      <span class="npc-stock" [class.low]="p.stock <= 5">
-                        {{ p.stock > 0 ? p.stock + ' EN STOCK' : 'AGOTADO' }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- Información Editorial del Producto + Acciones de Canje -->
-                  <div class="npc-body">
-                    <div class="npc-meta-row">
-                      <span class="npc-category">{{ p.categoryLabel }}</span>
-                      <span class="npc-rating">★ {{ p.rating }} ({{ p.reviewsCount }})</span>
-                    </div>
-
-                    <div class="npc-copy" (click)="openDetail(p)">
-                      <h3>{{ p.title }}</h3>
-                      <p>{{ p.subtitle }}</p>
-                    </div>
-
-                    <!-- Combinación de Tickets sugerida -->
-                    <div class="npc-ticket-pills">
-                      @for (tk of p.recommendedTickets; track $index) {
-                        <span class="npc-tk-chip" [class]="'npc-tk-chip card-tier-' + tk">
-                          Ticket {{ '$' + tk }}
-                        </span>
-                      }
-                    </div>
-
-                    <div class="npc-footer">
-                      <div class="npc-price">
-                        <span class="npc-price-lbl">PRECIO OFICIAL</span>
-                        <strong>{{ p.price | currency: 'MXN' : 'symbol-narrow' }} <small>MXN</small></strong>
-                      </div>
-
-                      <div class="npc-actions">
-                        <button
-                          type="button"
-                          class="npc-btn-redeem continuous apple-pressable"
-                          [disabled]="p.stock <= 0"
-                          (click)="buyNowWithTicket(p)"
-                        >
-                          <sf-symbol name="wallet.pass" [size]="15" />
-                          <span>Canjear</span>
-                        </button>
-                        <button
-                          type="button"
-                          class="npc-btn-bag continuous apple-pressable"
-                          [disabled]="p.stock <= 0"
-                          (click)="addToBag(p)"
-                          title="Agregar a la Bolsa"
-                          aria-label="Agregar a la Bolsa"
-                        >
-                          <sf-symbol name="plus" [size]="16" [weight]="2.6" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              }
-            </div>
-          }
-        </div>
-      </div>
+          <div class="nfd-foot">
+            <button type="button" class="nfd-clear continuous apple-pressable" (click)="resetFilters()">
+              Limpiar
+            </button>
+            <button type="button" class="nfd-apply continuous apple-pressable" (click)="filterDrawerOpen.set(false)">
+              Ver {{ filteredProducts().length }} productos
+            </button>
+          </div>
+        </aside>
+      }
 
       <!-- ==========================================================================
-           5. FOOTER EDITORIAL ESTILO NEW ERA MX CON AMBAS VARIANTES DEL LOGO
+           4. CUADRÍCULA DE PRODUCTOS (DISPOSICIÓN 1:1 CON LA IMAGEN ADJUNTADA:
+              2 COLUMNAS EN MÓVIL / 4 EN ESCRITORIO, IMAGEN + LÍNEA + TÍTULO + PRECIO + BOTÓN [+])
+           ========================================================================== -->
+      @if (filteredProducts().length === 0) {
+        <div class="ne-empty-state continuous">
+          <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nes-logo" />
+          <h3>No encontramos artículos con esos filtros</h3>
+          <p>Prueba seleccionando otra categoría o restablece los filtros activos.</p>
+          <button type="button" class="btn-primary continuous apple-pressable" (click)="resetFilters()">
+            Mostrar todos los productos
+          </button>
+        </div>
+      } @else {
+        <section class="ne-product-grid" [class.single-col]="gridMode() === 'single'">
+          @for (p of filteredProducts(); track p.id) {
+            <article class="ne-card continuous">
+              <!-- Contenedor visual del producto con icono/sello en esquina superior derecha -->
+              <div
+                class="ne-card-visual continuous apple-pressable"
+                [class]="'ne-card-visual continuous apple-pressable ' + p.surfaceClass"
+                (click)="openDetail(p)"
+              >
+                <span class="ne-corner-seal" title="Ver detalle del producto">
+                  <img src="assets/logos/marketstore-icon.png" alt="Market Store" />
+                </span>
+
+                <div class="ne-card-glyph" [style.color]="p.accentColor">
+                  <sf-symbol [name]="p.symbolName" [size]="52" [weight]="1.55" />
+                </div>
+              </div>
+
+              <!-- Línea divisoria horizontal estilo New Era MX (debajo del producto) -->
+              <div class="ne-card-Rule" aria-hidden="true">
+                <span class="ne-card-rule-active"></span>
+              </div>
+
+              <!-- Cuerpo de tarjeta: Etiqueta superior + Título + Fila inferior (Precio a la izquierda y botón [+] a la derecha) -->
+              <div class="ne-card-info">
+                <span class="ne-card-eyebrow">{{ p.badge || p.categoryLabel }}</span>
+
+                <h3 class="ne-card-title" (click)="openDetail(p)">
+                  {{ p.title }}
+                </h3>
+
+                <div class="ne-card-bottom">
+                  <strong class="ne-card-price">
+                    {{ p.price | currency: 'MXN' : 'symbol-narrow' }}
+                  </strong>
+
+                  <button
+                    type="button"
+                    class="ne-plus-btn continuous apple-pressable"
+                    [disabled]="p.stock <= 0"
+                    (click)="buyNowWithTicket(p)"
+                    [attr.aria-label]="'Agregar ' + p.title + ' a la bolsa'"
+                    title="Canjear o agregar a la bolsa"
+                  >
+                    <sf-symbol name="plus" [size]="15" [weight]="2.4" />
+                  </button>
+                </div>
+              </div>
+            </article>
+          }
+        </section>
+      }
+
+      <!-- ==========================================================================
+           5. FOOTER COMPACTO CON LAS 2 VARIANTES DEL LOGO DE MARKET STORE
            ========================================================================== -->
       <footer class="ne-footer continuous">
         <div class="nef-top">
           <div class="nef-brand-col">
             <div class="nef-logos-row">
-              <!-- Variante 1 y Variante 2 juntas en el cierre de marca -->
               <img src="assets/logos/marketstore-horizontal.png" alt="Market Store" class="nef-logo-h" />
               <img src="assets/logos/marketstore-icon.png" alt="Market Store Icono" class="nef-logo-sq" />
             </div>
             <p>
-              Tienda oficial de colecciones sincronizada en tiempo real con la bóveda móvil
-              <strong>WalletPay</strong> y validación criptográfica automática del <strong>Banco Central</strong>.
+              Tienda oficial sincronizada con la bóveda móvil <strong>WalletPay</strong> y validación automática del <strong>Banco Central</strong>.
             </p>
           </div>
 
@@ -464,7 +328,7 @@ interface HeroSlide {
           </div>
 
           <div class="nef-links-col">
-            <strong>SILUETAS DE TICKETS</strong>
+            <strong>TICKETS WALLETPAY</strong>
             @for (d of ticketDenominations; track d.amount) {
               <button type="button" (click)="selectDenom(d.amount)">
                 Ticket {{ '$' + d.amount }} MXN · {{ d.name }}
@@ -473,11 +337,9 @@ interface HeroSlide {
           </div>
 
           <div class="nef-links-col">
-            <strong>ECOSISTEMA WALLETPAY</strong>
-            <button type="button" (click)="goToWallet()">Mi Bóveda de Tickets</button>
+            <strong>MI CUENTA</strong>
+            <button type="button" (click)="goToWallet()">Mis Tickets ({{ market.activeTickets().length }})</button>
             <button type="button" (click)="market.cartOpen.set(true)">Bolsa de Compras ({{ market.cartCount() }})</button>
-            <span class="nef-sec-note">✓ Compra de tickets exclusiva en app WalletPay</span>
-            <span class="nef-sec-note">✓ Liquidación automática sin esperas</span>
           </div>
         </div>
       </footer>
@@ -489,7 +351,7 @@ interface HeroSlide {
           <div class="sheet-head">
             <div class="sh-brand">
               <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="sh-logo" />
-              <span class="sheet-title">Market Store · Ficha Oficial</span>
+              <span class="sheet-title">Detalle del Producto</span>
             </div>
             <button type="button" class="sheet-close apple-pressable" (click)="selectedProduct.set(null)">
               <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
@@ -568,526 +430,377 @@ interface HeroSlide {
   `,
   styles: [`
     .ne-storefront {
-      max-width: 1400px;
+      max-width: 1360px;
       margin: 0 auto;
-      padding: 20px 22px calc(env(safe-area-inset-bottom, 0px) + 96px);
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-
-    /* 1. HERO CAMPAIGN BANNER ESTILO NEW ERA MX */
-    .ne-hero-banner {
-      --r: 28px;
-      padding: 34px 36px;
-      background: linear-gradient(130deg, #0B132B 0%, #1D3557 48%, #2B70EA 100%);
-      color: #fff;
-      display: grid;
-      grid-template-columns: 1.35fr 0.85fr;
-      gap: 28px;
-      align-items: center;
-      box-shadow: 0 20px 44px rgba(11, 19, 43, 0.24);
-      position: relative;
-      overflow: hidden;
-    }
-    .ne-hero-left {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .ne-hero-brand-row {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .ne-hero-logo-h {
-      height: 44px;
-      width: auto;
-      border-radius: 10px;
-      object-fit: contain;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-    }
-    .ne-drop-pill {
-      padding: 5px 12px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.16);
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-    }
-    .ne-hero-left h1 {
-      margin: 0;
-      font-size: clamp(28px, 3.2vw, 44px);
-      font-weight: 900;
-      line-height: 1.04;
-      letter-spacing: -0.03em;
-      text-transform: uppercase;
-    }
-    .ne-hero-left p {
-      margin: 0;
-      font-size: 15px;
-      line-height: 1.45;
-      color: rgba(255, 255, 255, 0.86);
-      max-width: 580px;
-    }
-    .ne-hero-ctas {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 4px;
-    }
-    .ne-btn-primary {
-      --r: 12px;
-      height: 44px;
-      padding: 0 20px;
-      border: 0;
-      background: #FFFFFF;
-      color: #0B132B;
-      font-size: 12.5px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .ne-btn-glass {
-      --r: 12px;
-      height: 44px;
-      padding: 0 18px;
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      background: rgba(255, 255, 255, 0.12);
-      color: #fff;
-      font-size: 13px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .ne-hero-tabs {
-      margin-top: 8px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255, 255, 255, 0.14);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .ne-hero-tab {
-      border: 0;
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.72);
-      padding: 7px 12px;
-      border-radius: 9px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      cursor: pointer;
-    }
-    .ne-hero-tab.active {
-      background: #fff;
-      color: #0B132B;
-    }
-    .nht-num {
-      font-family: var(--font-mono);
-      opacity: 0.7;
-    }
-
-    .ne-hero-right {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .ne-floating-ticket {
-      --r: 22px;
-      padding: 18px 20px;
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
-    }
-    .nft-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-    }
-    .nft-issuer {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .nft-brand-mark {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
-      object-fit: cover;
-    }
-    .nft-val {
-      font-size: 42px;
-      font-weight: 900;
-      line-height: 0.95;
-      letter-spacing: -0.04em;
-    }
-    .nft-val .cur,
-    .nft-val .dec {
-      font-size: 18px;
-    }
-    .nft-val small {
-      font-size: 13px;
-      margin-left: 5px;
-    }
-    .nft-foot {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      opacity: 0.9;
-    }
-    .nft-chip {
-      width: 26px;
-      height: 18px;
-      border-radius: 4px;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.4));
-    }
-
-    .ne-hero-vault {
-      --r: 20px;
-      padding: 16px 18px;
-      background: rgba(255, 255, 255, 0.12);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .nhv-head {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .nhv-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 11px;
-      object-fit: cover;
-    }
-    .nhv-eyebrow {
-      display: block;
-      font-size: 9.5px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      opacity: 0.82;
-    }
-    .nhv-total {
-      font-size: 24px;
-      font-weight: 900;
-      letter-spacing: -0.03em;
-    }
-    .nhv-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .nhv-chip {
-      --r: 8px;
-      padding: 4px 10px;
-      font-size: 11.5px;
-      font-weight: 800;
-      color: #fff;
-    }
-    .nhv-empty {
-      font-size: 12px;
-      opacity: 0.85;
-    }
-
-    /* 2. STRIP DE COLECCIONES Y SILUETAS */
-    .ne-collections-strip {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .ncs-header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .ncs-eyebrow {
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      color: #2B70EA;
-    }
-    .ncs-header h2 {
-      margin: 2px 0 0;
-      font-size: 21px;
-      font-weight: 900;
-      letter-spacing: -0.02em;
-    }
-    .ncs-ticket-silhouettes {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .nts-label {
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      color: var(--ios-label-2);
-      margin-right: 4px;
-    }
-    .nts-pill {
-      --r: 10px;
-      height: 34px;
-      padding: 0 12px;
-      border: 0.5px solid var(--ios-separator);
-      background: var(--ios-cell);
-      color: var(--ios-label);
-      font-size: 12px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .nts-pill small {
-      color: var(--ios-label-2);
-      font-weight: 600;
-    }
-    .nts-pill.active {
-      background: #2B70EA;
-      border-color: #2B70EA;
-      color: #fff;
-    }
-    .nts-pill.active small {
-      color: rgba(255, 255, 255, 0.85);
-    }
-
-    .ne-cat-cards {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 10px;
-    }
-    .ne-cat-card {
-      --r: 18px;
-      padding: 14px;
-      border: 0.5px solid var(--ios-separator);
-      background: var(--ios-card-elevated);
-      color: var(--ios-label);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 14px;
-      text-align: left;
-    }
-    .ne-cat-card.active {
-      background: #2B70EA;
-      border-color: #2B70EA;
-      color: #fff;
-      box-shadow: 0 10px 22px rgba(43, 112, 234, 0.26);
-    }
-    .ncc-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .ncc-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: rgba(43, 112, 234, 0.12);
-      color: #2B70EA;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .ne-cat-card.active .ncc-icon {
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
-    }
-    .ncc-count {
-      font-size: 11px;
-      font-weight: 800;
-      opacity: 0.7;
-    }
-    .ncc-bottom {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .ncc-bottom strong {
-      font-size: 13.5px;
-      font-weight: 800;
-    }
-    .ncc-bottom span {
-      font-size: 10.5px;
-      opacity: 0.72;
-      font-weight: 600;
-    }
-
-    /* 3. TOOLBAR DE COLECCIÓN */
-    .ne-toolbar {
-      --r: 16px;
-      padding: 12px 16px;
-      background: var(--ios-cell);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .ntb-left,
-    .ntb-right {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .ntb-filter-btn {
-      --r: 10px;
-      height: 36px;
-      padding: 0 13px;
-      border: 0.5px solid var(--ios-separator);
-      background: var(--ios-sheet-cell);
-      color: var(--ios-label);
-      font-size: 11.5px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-    }
-    .ntb-filter-btn.active {
-      border-color: #2B70EA;
-      color: #2B70EA;
-    }
-    .ntb-breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--ios-label-2);
-    }
-    .ntb-breadcrumb strong {
-      color: var(--ios-label);
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-    .ntb-clear {
-      border: 0;
-      background: rgba(255, 59, 48, 0.12);
-      color: #FF3B30;
-      padding: 6px 11px;
-      border-radius: 8px;
-      font-size: 11.5px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      cursor: pointer;
-    }
-    .ntb-sort {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      font-weight: 800;
-      color: var(--ios-label-2);
-    }
-    .ntb-sort select {
-      height: 34px;
-      padding: 0 10px;
-      border-radius: 9px;
-      border: 0.5px solid var(--ios-separator);
-      background: var(--ios-sheet-cell);
-      color: var(--ios-label);
-      font-size: 12.5px;
-      font-weight: 600;
-      outline: none;
-    }
-    .ntb-grid-toggle {
-      display: inline-flex;
-      background: var(--ios-fill);
-      padding: 2px;
-      border-radius: 8px;
-    }
-    .ntb-grid-toggle button {
-      border: 0;
-      background: transparent;
-      color: var(--ios-label-2);
-      font-size: 11.5px;
-      font-weight: 800;
-      padding: 4px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .ntb-grid-toggle button.active {
-      background: var(--ios-sheet-cell);
-      color: #2B70EA;
-    }
-
-    /* 4. WORKSPACE DE 2 COLUMNAS */
-    .ne-catalog-workspace {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 20px;
-      align-items: start;
-    }
-    .ne-catalog-workspace.no-sidebar {
-      grid-template-columns: 1fr;
-    }
-
-    .ne-filter-sidebar {
-      --r: 22px;
-      position: sticky;
-      top: 76px;
-      padding: 16px;
-      background: var(--ios-cell);
+      padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 92px);
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-    .nfs-brand-card {
-      --r: 14px;
-      padding: 10px 12px;
-      background: #2B70EA;
-      color: #fff;
+
+    /* 1. PÍLDORAS DESLIZABLES DE COLECCIÓN */
+    .ne-categories-scroll {
       display: flex;
       align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 2px 0 4px;
+      scrollbar-width: none;
+    }
+    .ne-categories-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .ne-cat-pill {
+      --r: 999px;
+      height: 36px;
+      padding: 0 15px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-cell);
+      color: var(--ios-label-2);
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .ne-cat-pill.active {
+      background: var(--ion-color-primary);
+      border-color: var(--ion-color-primary);
+      color: #fff;
+    }
+
+    /* 2. CABECERA CENTRADA + BARRA "FILTRAR | X PRODUCTOS | [2x2] [1x1]" (1:1 IMAGEN 1) */
+    .ne-collection-header {
+      display: flex;
+      flex-direction: column;
       gap: 10px;
     }
-    .nfs-brand-icon {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      object-fit: cover;
-    }
-    .nfs-brand-card strong {
-      display: block;
-      font-size: 12.5px;
+    .ne-collection-title {
+      margin: 4px 0 2px;
+      text-align: center;
+      font-size: clamp(20px, 2.5vw, 28px);
       font-weight: 900;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--ios-label);
     }
-    .nfs-brand-card span {
+
+    .ne-control-bar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 8px 2px;
+      border-top: 0.5px solid var(--ios-separator);
+      border-bottom: 0.5px solid var(--ios-separator);
+    }
+
+    .ne-filter-trigger {
+      justify-self: start;
+      border: 0;
+      background: transparent;
+      color: var(--ios-label);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 6px 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+    .ne-filter-trigger.active {
+      color: var(--ion-color-primary);
+    }
+    .ne-filter-count {
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: var(--ion-color-primary);
+      color: #fff;
       font-size: 10.5px;
-      opacity: 0.88;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ne-products-count {
+      justify-self: center;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--ios-label-2);
+      white-space: nowrap;
+    }
+
+    .ne-view-switcher {
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ne-view-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+      border: 1px solid var(--ios-separator);
+      background: transparent;
+      color: var(--ios-label-2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+    .ne-view-btn.active {
+      border-color: var(--ios-label);
+      color: var(--ios-label);
+      background: var(--ios-cell);
+    }
+
+    .ne-active-chips {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .ne-chip {
+      --r: 999px;
+      border: 0;
+      padding: 5px 11px;
+      background: rgba(0, 122, 255, 0.12);
+      color: var(--ion-color-primary);
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .ne-chip-reset {
+      border: 0;
+      background: transparent;
+      color: var(--ion-color-danger);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    /* 3. CUADRÍCULA DE PRODUCTOS (1:1 CON LA IMAGEN ADJUNTADA) */
+    .ne-product-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 20px 16px;
+    }
+    .ne-product-grid.single-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ne-card {
+      --r: 18px;
+      background: var(--ios-card-elevated);
+      border: 0.5px solid var(--ios-separator);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      transition: transform 200ms ease, box-shadow 200ms ease;
+    }
+    .ne-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--ios-shadow-card);
+    }
+
+    .ne-card-visual {
+      --r: 14px;
+      position: relative;
+      aspect-ratio: 1 / 0.92;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .ne-corner-seal {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+    }
+    .ne-corner-seal img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .ne-card-glyph {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Línea divisoria horizontal debajo de la imagen (igual que en la captura) */
+    .ne-card-Rule {
+      width: 100%;
+      height: 1.5px;
+      background: var(--ios-separator);
+      margin: 10px 0 8px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ne-card-rule-active {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 28%;
+      background: var(--ios-label-2);
+    }
+
+    .ne-card-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+    .ne-card-eyebrow {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ios-label-2);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ne-card-title {
+      margin: 0 0 10px;
+      font-size: 13.5px;
+      font-weight: 500;
+      line-height: 1.32;
+      color: var(--ios-label);
+      cursor: pointer;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: 2.64em;
+    }
+
+    .ne-card-bottom {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .ne-card-price {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      color: var(--ios-label);
+    }
+
+    /* Botón rectangular [ + ] en la esquina inferior derecha (1:1 con la imagen) */
+    .ne-plus-btn {
+      --r: 8px;
+      width: 44px;
+      height: 32px;
+      border: 1px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .ne-plus-btn:hover {
+      border-color: var(--ion-color-primary);
+      color: var(--ion-color-primary);
+    }
+    .ne-plus-btn:disabled {
+      opacity: 0.4;
+    }
+
+    /* 4. DRAWER / SHEET DE FILTROS */
+    .ne-filter-drawer {
+      --r: 24px;
+      position: fixed;
+      z-index: 820;
+      top: 14px;
+      left: 14px;
+      bottom: 14px;
+      width: min(360px, calc(100vw - 28px));
+      background: var(--ios-sheet-bg);
+      box-shadow: var(--ios-shadow-float);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .nfd-head {
+      padding: 16px 18px 12px;
+      border-bottom: 0.5px solid var(--ios-separator);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nfd-title-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 17px;
+    }
+    .nfd-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+    }
+    .nfd-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .nfd-foot {
+      padding: 12px 18px calc(env(safe-area-inset-bottom, 0px) + 14px);
+      border-top: 0.5px solid var(--ios-separator);
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: 10px;
+    }
+    .nfd-clear {
+      --r: 12px;
+      height: 44px;
+      border: 0;
+      background: var(--ios-fill);
+      color: var(--ios-label);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .nfd-apply {
+      --r: 12px;
+      height: 44px;
+      border: 0;
+      background: var(--ion-color-primary);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
     }
 
     .nfs-group {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      padding-top: 12px;
-      border-top: 0.5px solid var(--ios-separator);
     }
     .nfs-group-title {
       font-size: 10.5px;
@@ -1095,6 +808,27 @@ interface HeroSlide {
       letter-spacing: 0.07em;
       color: var(--ios-label-2);
     }
+    .nfs-sort-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .nfs-sort-btn {
+      --r: 10px;
+      padding: 9px 10px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-sheet-cell);
+      color: var(--ios-label);
+      font-size: 12.5px;
+      font-weight: 600;
+      text-align: left;
+    }
+    .nfs-sort-btn.selected {
+      border-color: var(--ion-color-primary);
+      background: rgba(0, 122, 255, 0.12);
+      color: var(--ion-color-primary);
+    }
+
     .nfs-afford-toggle {
       --r: 13px;
       padding: 10px 12px;
@@ -1109,10 +843,10 @@ interface HeroSlide {
     }
     .nat-copy strong {
       display: block;
-      font-size: 12.5px;
+      font-size: 13px;
     }
     .nat-copy span {
-      font-size: 11px;
+      font-size: 11.5px;
       color: var(--ios-label-2);
     }
     .ios-switch {
@@ -1148,19 +882,19 @@ interface HeroSlide {
       border: 0;
       background: transparent;
       color: var(--ios-label);
-      padding: 7px 8px;
-      border-radius: 9px;
+      padding: 8px 10px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       gap: 9px;
-      font-size: 13px;
+      font-size: 13.5px;
       font-weight: 600;
       cursor: pointer;
       text-align: left;
     }
     .nfs-check-row.selected {
-      background: rgba(43, 112, 234, 0.12);
-      color: #2B70EA;
+      background: rgba(0, 122, 255, 0.12);
+      color: var(--ion-color-primary);
     }
     .nfs-radio {
       width: 16px;
@@ -1170,15 +904,15 @@ interface HeroSlide {
       flex-shrink: 0;
     }
     .nfs-radio.checked {
-      border-color: #2B70EA;
-      background: #2B70EA;
+      border-color: var(--ion-color-primary);
+      background: var(--ion-color-primary);
       box-shadow: inset 0 0 0 3px var(--ios-sheet-cell);
     }
     .nfs-lbl {
       flex: 1;
     }
     .nfs-badge {
-      font-size: 11px;
+      font-size: 11.5px;
       color: var(--ios-label-2);
       font-weight: 700;
     }
@@ -1199,8 +933,8 @@ interface HeroSlide {
       text-align: left;
     }
     .nfs-denom-btn.selected {
-      background: #2B70EA;
-      border-color: #2B70EA;
+      background: var(--ion-color-primary);
+      border-color: var(--ion-color-primary);
       color: #fff;
     }
     .nfs-denom-btn strong {
@@ -1208,197 +942,12 @@ interface HeroSlide {
     }
     .nfs-denom-btn span {
       font-size: 10.5px;
-      opacity: 0.78;
-    }
-
-    /* GRID DE PRODUCTOS ESTILO NEW ERA */
-    .ne-product-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(276px, 1fr));
-      gap: 18px;
-    }
-    .ne-product-grid.dense {
-      grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
-    }
-
-    .ne-product-card {
-      --r: 22px;
-      background: var(--ios-card-elevated);
-      border: 0.5px solid var(--ios-separator);
-      box-shadow: var(--ios-shadow-card);
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 12px;
-      transition: transform 220ms ease;
-    }
-    .ne-product-card:hover {
-      transform: translateY(-3px);
-    }
-    .npc-visual {
-      --r: 16px;
-      height: 190px;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-      overflow: hidden;
-    }
-    .npc-top-badges {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .npc-ticket-badge {
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--ios-sheet-cell);
-      color: #2B70EA;
-      font-size: 10.5px;
-      font-weight: 800;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .npc-brand-seal {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
-      overflow: hidden;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    }
-    .npc-brand-seal img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .npc-art {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: auto 0;
-    }
-    .npc-bottom-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      color: var(--ios-label-2);
-    }
-    .npc-stock.low {
-      color: #F59E0B;
-    }
-
-    .npc-body {
-      padding: 0 4px 4px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      flex: 1;
-    }
-    .npc-meta-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #2B70EA;
-    }
-    .npc-rating {
-      color: #F59E0B;
-    }
-    .npc-copy {
-      cursor: pointer;
-    }
-    .npc-copy h3 {
-      margin: 0 0 4px;
-      font-size: 16.5px;
-      font-weight: 800;
-      letter-spacing: -0.015em;
-    }
-    .npc-copy p {
-      margin: 0;
-      font-size: 12.5px;
-      color: var(--ios-label-2);
-      line-height: 1.35;
-    }
-    .npc-ticket-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-    .npc-tk-chip {
-      padding: 3px 8px;
-      border-radius: 6px;
-      color: #fff;
-      font-size: 10.5px;
-      font-weight: 800;
-    }
-    .npc-footer {
-      margin-top: auto;
-      padding-top: 10px;
-      border-top: 0.5px solid var(--ios-separator);
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .npc-price-lbl {
-      display: block;
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      color: var(--ios-label-2);
-    }
-    .npc-price strong {
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: -0.03em;
-    }
-    .npc-price small {
-      font-size: 11px;
-      color: var(--ios-label-2);
-    }
-    .npc-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .npc-btn-redeem {
-      --r: 10px;
-      height: 36px;
-      padding: 0 12px;
-      border: 0;
-      background: rgba(43, 112, 234, 0.14);
-      color: #2B70EA;
-      font-size: 12.5px;
-      font-weight: 800;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .npc-btn-bag {
-      --r: 10px;
-      width: 36px;
-      height: 36px;
-      border: 0;
-      background: #2B70EA;
-      color: #fff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
+      opacity: 0.8;
     }
 
     .ne-empty-state {
       --r: 22px;
-      padding: 48px 24px;
+      padding: 44px 20px;
       background: var(--ios-cell);
       text-align: center;
       display: flex;
@@ -1407,72 +956,68 @@ interface HeroSlide {
       gap: 10px;
     }
     .nes-logo {
-      width: 56px;
-      height: 56px;
-      border-radius: 15px;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
     }
 
-    /* 5. FOOTER EDITORIAL ESTILO NEW ERA */
+    /* 5. FOOTER */
     .ne-footer {
-      --r: 26px;
+      --r: 22px;
       margin-top: 12px;
-      padding: 30px 32px;
-      background: #0B132B;
-      color: #fff;
+      padding: 24px 26px;
+      background: var(--ios-cell);
+      border: 0.5px solid var(--ios-separator);
     }
     .nef-top {
       display: grid;
       grid-template-columns: 1.4fr 1fr 1fr 1fr;
-      gap: 24px;
+      gap: 20px;
     }
     .nef-logos-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 8px;
     }
     .nef-logo-h {
-      height: 40px;
+      height: 36px;
       width: auto;
-      border-radius: 9px;
+      border-radius: 8px;
     }
     .nef-logo-sq {
-      width: 40px;
-      height: 40px;
-      border-radius: 9px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
     }
     .nef-brand-col p {
       margin: 0;
-      font-size: 13px;
-      line-height: 1.45;
-      color: rgba(255, 255, 255, 0.76);
+      font-size: 12.5px;
+      line-height: 1.42;
+      color: var(--ios-label-2);
     }
     .nef-links-col {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 7px;
+      gap: 6px;
     }
     .nef-links-col strong {
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 800;
-      letter-spacing: 0.08em;
-      color: #60A5FA;
-      margin-bottom: 3px;
+      letter-spacing: 0.07em;
+      color: var(--ion-color-primary);
+      margin-bottom: 2px;
     }
     .nef-links-col button {
       border: 0;
       background: transparent;
-      color: rgba(255, 255, 255, 0.84);
+      color: var(--ios-label-2);
       font-size: 12.5px;
       font-weight: 600;
       padding: 0;
       cursor: pointer;
-    }
-    .nef-sec-note {
-      font-size: 11.5px;
-      color: #30D158;
-      font-weight: 700;
+      text-align: left;
     }
 
     /* MODAL DETALLE */
@@ -1485,13 +1030,13 @@ interface HeroSlide {
       backdrop-filter: blur(5px);
     }
     .detail-sheet {
-      --r: 28px;
+      --r: 26px;
       position: fixed;
       z-index: 810;
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      width: min(560px, calc(100vw - 28px));
+      width: min(540px, calc(100vw - 24px));
       max-height: 88vh;
       overflow-y: auto;
       background: var(--ios-sheet-bg);
@@ -1509,18 +1054,18 @@ interface HeroSlide {
       border-radius: 6px;
     }
     .detail-content {
-      padding: 6px 20px 0;
+      padding: 6px 18px 0;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
     .detail-visual {
-      --r: 20px;
-      padding: 28px 18px 14px;
+      --r: 18px;
+      padding: 24px 16px 14px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
     }
     .dv-badges {
       display: flex;
@@ -1532,24 +1077,24 @@ interface HeroSlide {
       padding: 4px 10px;
       border-radius: 999px;
       background: var(--ios-sheet-cell);
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 600;
       color: var(--ios-label-2);
     }
     .detail-info h2 {
       margin: 0 0 6px;
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 800;
     }
     .detail-desc {
-      margin: 0 0 14px;
-      font-size: 14px;
-      line-height: 1.45;
+      margin: 0 0 12px;
+      font-size: 13.5px;
+      line-height: 1.42;
       color: var(--ios-label-2);
     }
     .ticket-match-box {
       --r: 14px;
-      padding: 12px 14px;
+      padding: 12px;
       background: var(--ios-sheet-cell);
       margin-bottom: 12px;
     }
@@ -1564,32 +1109,32 @@ interface HeroSlide {
     .tm-pills {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
     }
     .tm-ticket {
-      --r: 9px;
-      padding: 6px 12px;
+      --r: 8px;
+      padding: 5px 10px;
       color: #fff;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
     .specs-list {
       --r: 14px;
       background: var(--ios-sheet-cell);
-      padding: 12px 14px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .spec-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 13.5px;
+      font-size: 13px;
     }
     .spec-item sf-symbol {
       color: var(--ion-color-success);
@@ -1598,7 +1143,7 @@ interface HeroSlide {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
     .detail-price span {
@@ -1607,59 +1152,113 @@ interface HeroSlide {
       color: var(--ios-label-2);
     }
     .detail-price strong {
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 800;
     }
     .detail-btns {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
     .btn-secondary {
       --r: 12px;
-      height: 44px;
-      padding: 0 16px;
+      height: 42px;
+      padding: 0 14px;
       border: 0;
       background: var(--ios-fill);
       color: var(--ios-label);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 700;
     }
     .btn-primary {
       --r: 12px;
-      height: 44px;
-      padding: 0 18px;
+      height: 42px;
+      padding: 0 16px;
       border: 0;
-      background: #2B70EA;
+      background: var(--ion-color-primary);
       color: #fff;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
       gap: 6px;
     }
 
-    @media (max-width: 1040px) {
-      .ne-hero-banner {
-        grid-template-columns: 1fr;
-      }
-      .ne-cat-cards {
-        grid-template-columns: repeat(3, 1fr);
-      }
-      .ne-catalog-workspace {
-        grid-template-columns: 1fr;
-      }
-      .ne-filter-sidebar {
-        position: static;
+    /* ==========================================================================
+       RESPONSIVE MÓVIL Y TABLET (1:1 CON LA DISPOSICIÓN DE LA IMAGEN 1)
+       ========================================================================== */
+    @media (max-width: 980px) {
+      .ne-product-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       .nef-top {
         grid-template-columns: 1fr 1fr;
       }
     }
 
-    @media (max-width: 640px) {
-      .ne-cat-cards,
-      .nef-top {
+    @media (max-width: 720px) {
+      .ne-storefront {
+        padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 84px);
+        gap: 12px;
+      }
+      /* 2 columnas en móvil igual que en la imagen adjuntada */
+      .ne-product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 10px;
+      }
+      /* 1 columna cuando el usuario toca el icono de cuadrado simple */
+      .ne-product-grid.single-col {
+        grid-template-columns: 1fr;
+      }
+      .ne-card {
+        padding: 8px;
+      }
+      .ne-card-title {
+        font-size: 12.5px;
+        margin-bottom: 8px;
+      }
+      .ne-card-price {
+        font-size: 14px;
+      }
+      .ne-plus-btn {
+        width: 40px;
+        height: 30px;
+      }
+      .ne-filter-drawer {
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-height: 86vh;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+      .detail-sheet {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        transform: none;
+        width: 100%;
+        max-height: 90vh;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+      .detail-cta-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .detail-btns {
+        display: grid;
         grid-template-columns: 1fr 1fr;
+      }
+      .nef-top {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .ne-footer {
+        padding: 18px 16px;
       }
     }
   `]
@@ -1673,56 +1272,18 @@ export class CatalogPage {
   readonly onlyAffordable = this.market.onlyAffordable;
   readonly selectedProduct = signal<Product | null>(null);
 
-  readonly heroSlideIndex = signal<number>(0);
   readonly selectedDenom = signal<TicketDenomination | null>(null);
   readonly onlyInStock = signal<boolean>(false);
   readonly sortBy = signal<SortOption>('featured');
-  readonly sidebarOpen = signal<boolean>(true);
-  readonly denseGrid = signal<boolean>(false);
+  readonly filterDrawerOpen = signal<boolean>(false);
+  readonly gridMode = signal<'multi' | 'single'>('multi');
 
-  readonly heroSlides: HeroSlide[] = [
-    {
-      id: 'drops',
-      tag: 'NUEVOS LANZAMIENTOS',
-      title: 'Colecciones Oficiales Market Store · Red WalletPay',
-      subtitle:
-        'Explora nuestros nuevos lanzamientos y liquida tu pedido de forma inmediata con tus certificados de $50, $100, $200 y $500 MXN validados automáticamente por el Banco Central.',
-      ctaLabel: 'Explorar Nuevos Lanzamientos',
-      category: 'all',
-      denomFilter: null,
-      ticketPreviewAmount: 100,
-      ticketPreviewTier: 'PLATA',
-      ticketPreviewClass: 'card-tier-100'
-    },
-    {
-      id: 'titanium',
-      tag: 'EDICIÓN TITANIUM $500',
-      title: 'Cómputo, Estudio & Titanio Grado Aeroespacial',
-      subtitle:
-        'Ingeniería de precisión y monitores Mini LED listos para canje directo con certificados Titanium de $500 MXN o combinación de tickets.',
-      ctaLabel: 'Ver Colección Estudio',
-      category: 'estudio',
-      denomFilter: 500,
-      ticketPreviewAmount: 500,
-      ticketPreviewTier: 'TITANIUM',
-      ticketPreviewClass: 'card-tier-500'
-    },
-    {
-      id: 'magsafe-audio',
-      tag: 'MAGSAFE & AUDIO SPATIAL',
-      title: 'Accesorios Magnéticos Qi2 & Audio de Estudio',
-      subtitle:
-        'Desde localizadores UWB de $50 MXN hasta auriculares con audio espacial de $200 MXN. Filtra por tu silueta de ticket favorita.',
-      ctaLabel: 'Explorar MagSafe',
-      category: 'magsafe',
-      denomFilter: null,
-      ticketPreviewAmount: 200,
-      ticketPreviewTier: 'ORO',
-      ticketPreviewClass: 'card-tier-200'
-    }
+  readonly sortOptions: { id: SortOption; label: string }[] = [
+    { id: 'featured', label: 'Destacados' },
+    { id: 'price-asc', label: 'Menor precio' },
+    { id: 'price-desc', label: 'Mayor precio' },
+    { id: 'rating', label: 'Mejor calificados' }
   ];
-
-  readonly activeHeroSlide = computed(() => this.heroSlides[this.heroSlideIndex()] || this.heroSlides[0]);
 
   readonly ticketDenominations: { amount: TicketDenomination; name: string }[] = [
     { amount: 50, name: 'Estándar' },
@@ -1731,18 +1292,18 @@ export class CatalogPage {
     { amount: 500, name: 'Titanium' }
   ];
 
-  readonly categories: { id: ProductCategory; label: string; icon: string; code: string }[] = [
-    { id: 'all', label: 'Todo el Catálogo', icon: 'storefront', code: 'FULL COLLECTION' },
-    { id: 'magsafe', label: 'Accesorios MagSafe', icon: 'bolt.fill', code: 'QI2 & UWB SERIES' },
-    { id: 'audio', label: 'Audio y Música', icon: 'headphones', code: 'SPATIAL SOUND' },
-    { id: 'hogar', label: 'Hogar Inteligente', icon: 'speaker.wave.2', code: 'MATTER & THREAD' },
-    { id: 'estudio', label: 'Cómputo y Estudio', icon: 'laptopcomputer', code: 'PRO WORKSTATION' },
-    { id: 'digital', label: 'Tarjetas y Digital', icon: 'shield.checkered', code: 'CLOUD VAULT' }
+  readonly categories: { id: ProductCategory; label: string; icon: string; title: string }[] = [
+    { id: 'all', label: 'Todos', icon: 'storefront', title: 'CATÁLOGO' },
+    { id: 'magsafe', label: 'MagSafe', icon: 'bolt.fill', title: 'ACCESORIOS MAGSAFE' },
+    { id: 'audio', label: 'Audio', icon: 'headphones', title: 'AUDIO Y MÚSICA' },
+    { id: 'hogar', label: 'Hogar', icon: 'speaker.wave.2', title: 'HOGAR INTELIGENTE' },
+    { id: 'estudio', label: 'Estudio', icon: 'laptopcomputer', title: 'CÓMPUTO Y ESTUDIO' },
+    { id: 'digital', label: 'Digital', icon: 'shield.checkered', title: 'TARJETAS Y DIGITAL' }
   ];
 
-  readonly activeCategoryLabel = computed(() => {
+  readonly activeCategoryTitle = computed(() => {
     const found = this.categories.find((c) => c.id === this.selectedCategory());
-    return found ? found.label : 'Todo el Catálogo';
+    return found ? found.title : 'CATÁLOGO';
   });
 
   readonly filteredProducts = computed(() => {
@@ -1788,25 +1349,17 @@ export class CatalogPage {
     return all.filter((p) => p.category === cat).length;
   }
 
+  activeFiltersCount(): number {
+    let count = 0;
+    if (this.selectedCategory() !== 'all') count++;
+    if (this.onlyAffordable()) count++;
+    if (this.selectedDenom() !== null) count++;
+    if (this.onlyInStock()) count++;
+    return count;
+  }
+
   hasActiveFilters(): boolean {
-    return (
-      this.selectedCategory() !== 'all' ||
-      this.onlyAffordable() ||
-      this.selectedDenom() !== null ||
-      this.onlyInStock() ||
-      this.searchQuery().trim().length > 0
-    );
-  }
-
-  selectHeroSlide(idx: number): void {
-    this.market.haptic('selection');
-    this.heroSlideIndex.set(idx);
-  }
-
-  applyHeroSlideFilter(slide: HeroSlide): void {
-    this.market.haptic('selection');
-    this.selectedCategory.set(slide.category);
-    this.selectedDenom.set(slide.denomFilter);
+    return this.activeFiltersCount() > 0 || this.searchQuery().trim().length > 0;
   }
 
   selectCategory(cat: ProductCategory): void {

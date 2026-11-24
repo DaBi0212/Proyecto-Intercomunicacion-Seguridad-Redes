@@ -421,6 +421,21 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
         grid-template-columns: 1fr;
       }
     }
+    @media (max-width: 640px) {
+      .page-container {
+        padding: 14px 12px calc(env(safe-area-inset-bottom, 0px) + 86px);
+        gap: 16px;
+      }
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+      .oc-head,
+      .oct-head,
+      .oc-foot {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+    }
   `]
 })
 export class OrdersPage {

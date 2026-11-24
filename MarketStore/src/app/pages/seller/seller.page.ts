@@ -489,7 +489,7 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
     /* Inventario */
     .inv-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
       gap: 16px;
     }
     .inv-card {

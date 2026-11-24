@@ -1099,22 +1099,56 @@ import { SfSymbolComponent } from './sf-symbol.component';
     }
 
     @media (max-width: 780px) {
+      .ne-promo-inner {
+        padding: 5px 12px;
+      }
       .ne-promo-right,
       .ne-wallet-pill,
       .ne-uname,
       .ne-bag-label {
         display: none;
       }
-      .ne-logo-horizontal-badge {
-        display: none;
+      .ne-header-inner {
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
       }
-      .ne-logo-compact-badge {
-        display: block;
+      .ne-brand-zone {
+        gap: 8px;
+      }
+      .ne-logo-horizontal-badge {
+        height: 36px;
+        padding: 4px 10px;
+      }
+      .ne-logo-horizontal-img {
+        height: 26px;
+      }
+      .ne-actions-zone {
+        flex: 1;
+        justify-content: flex-end;
+        gap: 6px;
+        min-width: 0;
       }
       .ne-search-pill,
       .ne-search-pill:focus-within {
-        width: auto;
-        flex: 1;
+        order: 10;
+        width: 100%;
+        flex: 1 1 100%;
+        height: 36px;
+      }
+      .ne-icon-btn,
+      .ne-user-btn,
+      .ne-bag-btn {
+        height: 34px;
+      }
+      .ne-icon-btn {
+        width: 34px;
+      }
+      .ne-user-btn {
+        padding: 0 4px;
+      }
+      .ne-bag-btn {
+        padding: 0 10px;
       }
       .mobile-tab-bar {
         position: fixed;
