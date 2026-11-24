@@ -1305,7 +1305,7 @@ export class StorePage {
   readonly rejectionReason = signal('');
   private cancelWaitingFlag = false;
 
-  readonly payLabel = computed(() => 'Solicitar Aprobación del Banco Central');
+  readonly payLabel = computed(() => 'Realizar Pago');
 
   previewCardBrand(): { name: string; tint: string; gradient: string } {
     const digits = this.newCardNumber.replace(/\D/g, '');

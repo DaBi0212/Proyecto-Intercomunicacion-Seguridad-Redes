@@ -521,7 +521,7 @@ type RedeemState = 'idle' | 'verifying' | 'done';
                 <ion-list [inset]="true">
                   <ion-item>
                     <ion-label>Comercio Web</ion-label>
-                    <ion-note slot="end">MarketStore (Vercel)</ion-note>
+                    <ion-note slot="end">MarketStore</ion-note>
                   </ion-item>
                   <ion-item>
                     <ion-label>Ticket seleccionado</ion-label>

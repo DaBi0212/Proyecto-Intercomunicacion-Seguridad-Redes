@@ -157,31 +157,32 @@ import { SfSymbolComponent } from './sf-symbol.component';
           </a>
         </nav>
 
-        <!-- DERECHA: Buscador iOS + Píldora de Saldo WalletPay + Cuenta + Tema + Bolsa de Compras -->
-        <div class="ne-actions-zone">
-          <form class="ne-search-pill continuous" (submit)="onSearchSubmit($event)">
-            <sf-symbol name="magnifyingglass" [size]="15" [weight]="2.2" />
-            <input
-              type="search"
-              class="ne-search-input"
-              placeholder="Buscar colección, producto, SKU…"
-              [ngModel]="market.searchQuery()"
-              (ngModelChange)="onSearchInput($event)"
-              name="globalSearch"
-              autocomplete="off"
-            />
-            @if (market.searchQuery()) {
-              <button
-                type="button"
-                class="ne-search-clear"
-                (click)="clearSearch()"
-                aria-label="Limpiar búsqueda"
-              >
-                <sf-symbol name="xmark" [size]="11" [weight]="2.6" />
-              </button>
-            }
-          </form>
+        <!-- BUSCADOR iOS (En escritorio a la derecha; en móvil baja a una segunda fila completa) -->
+        <form class="ne-search-pill continuous" (submit)="onSearchSubmit($event)">
+          <sf-symbol name="magnifyingglass" [size]="15" [weight]="2.2" />
+          <input
+            type="search"
+            class="ne-search-input"
+            placeholder="Buscar colección, producto, SKU…"
+            [ngModel]="market.searchQuery()"
+            (ngModelChange)="onSearchInput($event)"
+            name="globalSearch"
+            autocomplete="off"
+          />
+          @if (market.searchQuery()) {
+            <button
+              type="button"
+              class="ne-search-clear"
+              (click)="clearSearch()"
+              aria-label="Limpiar búsqueda"
+            >
+              <sf-symbol name="xmark" [size]="11" [weight]="2.6" />
+            </button>
+          }
+        </form>
 
+        <!-- DERECHA: Píldora de Saldo WalletPay + Cuenta + Tema + Bolsa de Compras + Bloquear -->
+        <div class="ne-actions-zone">
           <button
             type="button"
             class="ne-wallet-pill continuous apple-pressable"
@@ -1098,7 +1099,7 @@ import { SfSymbolComponent } from './sf-symbol.component';
       }
     }
 
-    @media (max-width: 780px) {
+    @media (max-width: 820px) {
       .ne-promo-inner {
         padding: 5px 12px;
       }
@@ -1109,46 +1110,70 @@ import { SfSymbolComponent } from './sf-symbol.component';
         display: none;
       }
       .ne-header-inner {
-        padding: 8px 12px;
+        padding: 10px 12px;
+        display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
       }
       .ne-brand-zone {
+        order: 1;
+        display: flex;
+        align-items: center;
         gap: 8px;
+        flex-shrink: 0;
+      }
+      .ne-hamburger {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
       }
       .ne-logo-horizontal-badge {
         height: 36px;
         padding: 4px 10px;
+        flex-shrink: 0;
       }
       .ne-logo-horizontal-img {
-        height: 26px;
+        height: 25px;
       }
       .ne-actions-zone {
-        flex: 1;
+        order: 2;
+        display: flex;
+        align-items: center;
         justify-content: flex-end;
-        gap: 6px;
-        min-width: 0;
-      }
-      .ne-search-pill,
-      .ne-search-pill:focus-within {
-        order: 10;
-        width: 100%;
-        flex: 1 1 100%;
-        height: 36px;
+        gap: 7px;
+        flex-shrink: 0;
+        margin-left: auto;
       }
       .ne-icon-btn,
       .ne-user-btn,
       .ne-bag-btn {
-        height: 34px;
+        height: 36px;
+        flex-shrink: 0;
       }
       .ne-icon-btn {
-        width: 34px;
+        width: 36px;
       }
       .ne-user-btn {
-        padding: 0 4px;
+        width: 36px;
+        padding: 0;
+        justify-content: center;
+      }
+      .ne-avatar {
+        width: 28px;
+        height: 28px;
       }
       .ne-bag-btn {
-        padding: 0 10px;
+        padding: 0 11px;
+        gap: 5px;
+      }
+      .ne-search-pill,
+      .ne-search-pill:focus-within {
+        order: 3;
+        flex: 0 0 100%;
+        width: 100%;
+        height: 38px;
       }
       .mobile-tab-bar {
         position: fixed;

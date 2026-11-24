@@ -101,13 +101,13 @@ export class WalletStateService {
   private savePersistedSession(email: string, name: string): void {
     try {
       localStorage.setItem('wp_active_session_user_v2', JSON.stringify({ email, name }));
-    } catch {}
+    } catch { }
   }
 
   private clearPersistedSession(): void {
     try {
       localStorage.removeItem('wp_active_session_user_v2');
-    } catch {}
+    } catch { }
   }
 
   private restorePersistedSession(): void {
@@ -127,7 +127,7 @@ export class WalletStateService {
       if (this.router.url === '/' || this.router.url.startsWith('/auth')) {
         this.router.navigateByUrl('/tabs/store');
       }
-    } catch {}
+    } catch { }
   }
 
   private async trySilentReauth(): Promise<boolean> {
@@ -147,7 +147,7 @@ export class WalletStateService {
         }
         return true;
       }
-    } catch {}
+    } catch { }
     return false;
   }
 
@@ -165,7 +165,7 @@ export class WalletStateService {
           return;
         }
       }
-    } catch {}
+    } catch { }
     this.registeredUsers.set([]);
   }
 
@@ -188,7 +188,7 @@ export class WalletStateService {
     this.registeredUsers.set(updated);
     try {
       localStorage.setItem('wp_local_device_accounts_v2', JSON.stringify(updated));
-    } catch {}
+    } catch { }
   }
 
   removeLocalDeviceAccount(email: string): void {
@@ -199,7 +199,7 @@ export class WalletStateService {
     this.registeredUsers.set(filtered);
     try {
       localStorage.setItem('wp_local_device_accounts_v2', JSON.stringify(filtered));
-    } catch {}
+    } catch { }
   }
 
   private loadAccountCards(email: string, serverSavedCardsJson?: string): void {
@@ -218,7 +218,7 @@ export class WalletStateService {
           localStorage.setItem(`wp_account_cards_${clean}`, JSON.stringify(parsed));
           return;
         }
-      } catch {}
+      } catch { }
     }
 
     // 2. Cargar del almacenamiento local exclusivo de este correo
@@ -230,12 +230,12 @@ export class WalletStateService {
           this.savedUserCards.set(parsed);
           // Sincronizar hacia el servidor si el servidor aún no las tenía
           if (parsed.length > 0 && (!serverSavedCardsJson || serverSavedCardsJson === '[]')) {
-            this.crypto.request('user.cards.save', { cards: parsed }).catch(() => {});
+            this.crypto.request('user.cards.save', { cards: parsed }).catch(() => { });
           }
           return;
         }
       }
-    } catch {}
+    } catch { }
 
     this.savedUserCards.set([]);
   }
@@ -247,10 +247,10 @@ export class WalletStateService {
     this.savedUserCards.set(updated);
     try {
       localStorage.setItem(`wp_account_cards_${cleanEmail}`, JSON.stringify(updated));
-    } catch {}
+    } catch { }
     try {
       await this.crypto.request('user.cards.save', { cards: updated });
-    } catch {}
+    } catch { }
   }
 
   async removeUserCard(cardId: string): Promise<void> {
@@ -260,10 +260,10 @@ export class WalletStateService {
     this.savedUserCards.set(updated);
     try {
       localStorage.setItem(`wp_account_cards_${cleanEmail}`, JSON.stringify(updated));
-    } catch {}
+    } catch { }
     try {
       await this.crypto.request('user.cards.save', { cards: updated });
-    } catch {}
+    } catch { }
   }
 
   async saveNetworkSettings(bankUrl: string, storeUrl: string): Promise<{ ok: boolean; message: string }> {
@@ -466,7 +466,7 @@ export class WalletStateService {
       this.addAuditLog('warn', 'No se pudo conectar con CentralBank (:7070).');
       return {
         ok: false,
-        error: `No se pudo conectar con CentralBank (${this.crypto.getCustomBankUrl()}). Verifica que CentralBank.exe esté abierto.`
+        error: `Oops!... Algo salio mal. Intentalo de nuevo mas tarde, el servidor esta caido`
       };
     }
   }
@@ -535,7 +535,7 @@ export class WalletStateService {
 
   lockSession(reason = 'Cambio de usuario / Cierre de sesión'): void {
     this.clearPersistedSession();
-    this.crypto.request('auth.logout').catch(() => {});
+    this.crypto.request('auth.logout').catch(() => { });
     this.jwtToken = null;
     this.isAuthenticated.set(false);
     this.tickets.set([]);
