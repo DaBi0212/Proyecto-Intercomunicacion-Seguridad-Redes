@@ -25,9 +25,16 @@ export class BankCryptoService {
   private localVaultKeyBytes = '';
   private queryBankHint = '';
 
+  private lastDiscoveredEndpoints: string[] = [];
+  private lastDiscoveryFetchAt = 0;
+
   constructor() {
     try {
       localStorage.removeItem('ms_custom_bank_url');
+      const cached = localStorage.getItem('ms_last_working_bank_url');
+      if (cached) {
+        this.lastDiscoveredEndpoints = [BankCryptoService.normalizeBankApiUrl(cached)];
+      }
     } catch {}
 
     if (typeof window !== 'undefined' && window.location?.search) {
@@ -117,22 +124,60 @@ export class BankCryptoService {
       }
     };
 
-    await Promise.allSettled([
-      this.fetchWithTimeout(`${environment.discoveryUrl}&_t=${Date.now()}`, undefined, 2200)
-        .then((r) => (r.ok ? r.text() : ''))
-        .then((t) => {
-          if (t) parseDiscoveryText(t);
-        }),
-      this.fetchWithTimeout(`${environment.githubDiscoveryUrl}?t=${Date.now()}`, undefined, 2200)
-        .then((r) => (r.ok ? r.text() : ''))
-        .then((t) => {
-          if (t) parseDiscoveryText(t);
-        })
-    ]);
+    const now = Date.now();
+    // Si ya descubrimos endpoints hace menos de 20 segundos, reutilizarlos para no saturar ntfy.sh (429)
+    if (this.lastDiscoveredEndpoints.length > 0 && now - this.lastDiscoveryFetchAt < 20000) {
+      for (const u of this.lastDiscoveredEndpoints) {
+        if (!isHttpsPage || u.startsWith('https://') || u.includes('localhost') || u.includes('127.0.0.1')) {
+          urls.add(u);
+        }
+      }
+    } else {
+      const backupNtfyUrl = 'https://ntfy.sh/marketstore_cb_dabi0212_v2/raw?poll=1&since=all';
+      const githubApiUrl =
+        'https://api.github.com/repos/DaBi0212/Proyecto-Intercomunicacion-Seguridad-Redes/contents/bank-discovery.json';
+
+      await Promise.allSettled([
+        this.fetchWithTimeout(`${githubApiUrl}?t=${now}`, {
+          headers: { Accept: 'application/vnd.github.v3.raw' }
+        }, 2500)
+          .then((r) => (r.ok ? r.text() : ''))
+          .then((t) => {
+            if (t) parseDiscoveryText(t);
+          }),
+        this.fetchWithTimeout(`${environment.githubDiscoveryUrl}?t=${now}`, undefined, 2500)
+          .then((r) => (r.ok ? r.text() : ''))
+          .then((t) => {
+            if (t) parseDiscoveryText(t);
+          }),
+        this.fetchWithTimeout(`${backupNtfyUrl}&_t=${now}`, undefined, 2200)
+          .then((r) => (r.ok ? r.text() : ''))
+          .then((t) => {
+            if (t) parseDiscoveryText(t);
+          }),
+        this.fetchWithTimeout(`${environment.discoveryUrl}&_t=${now}`, undefined, 2200)
+          .then((r) => (r.ok ? r.text() : ''))
+          .then((t) => {
+            if (t) parseDiscoveryText(t);
+          })
+      ]);
+
+      if (urls.size > 0) {
+        this.lastDiscoveredEndpoints = Array.from(urls);
+        this.lastDiscoveryFetchAt = now;
+      }
+    }
+
+    try {
+      const cached = localStorage.getItem('ms_last_working_bank_url');
+      if (cached && (!isHttpsPage || cached.startsWith('https://') || cached.includes('localhost') || cached.includes('127.0.0.1'))) {
+        urls.add(BankCryptoService.normalizeBankApiUrl(cached));
+      }
+    } catch {}
 
     // Localhost y 127.0.0.1 son permitidos por navegadores de escritorio incluso desde HTTPS (Vercel)
-    urls.add('http://localhost:7070/api');
     urls.add('http://127.0.0.1:7070/api');
+    urls.add('http://localhost:7070/api');
 
     if (!isHttpsPage) {
       urls.add(environment.bankApiUrl);
@@ -150,6 +195,15 @@ export class BankCryptoService {
 
   async testConnection(): Promise<{ ok: boolean; activeUrl: string; lanIp?: string; error?: string }> {
     try {
+      if (this.sessionId && this.sessionKeyBytes && this.bankPublicKey && this.activeBaseUrl) {
+        const probe = await this.fetchWithTimeout(`${this.activeBaseUrl}/health`, undefined, 2500);
+        if (probe.ok) {
+          return {
+            ok: true,
+            activeUrl: this.activeBaseUrl
+          };
+        }
+      }
       this.resetChannel();
       this.activeBaseUrl = '';
       await this.ensureChannel();
@@ -158,6 +212,7 @@ export class BankCryptoService {
         activeUrl: this.activeBaseUrl
       };
     } catch {
+      this.lastDiscoveryFetchAt = 0;
       return {
         ok: false,
         activeUrl: this.getActiveBankUrl(),
@@ -352,6 +407,9 @@ export class BankCryptoService {
     this.sessionKeyBytes = winner.aesKey;
     this.activeBaseUrl = winner.base;
     this.serverClockOffsetMs = winner.clockOffset;
+    try {
+      localStorage.setItem('ms_last_working_bank_url', winner.base);
+    } catch {}
   }
 
   async request<T = any>(action: string, payload: Record<string, unknown> = {}, retry = true): Promise<T> {

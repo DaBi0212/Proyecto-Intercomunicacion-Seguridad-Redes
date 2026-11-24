@@ -1,44 +1,10 @@
 <!-- ============================================================================
      ARQUITECTURA DE NAVEGACIÓN ESTILO NEW ERA MÉXICO (NEWERA.MX) CON ESTÉTICA iOS
-     1. Barra Superior de Anuncios (Top Promo Marquee)
-     2. Header Principal en 3 Zonas (Logo Oficial Market Store + Menú Editorial + Buscador/Bolsa/Tickets)
-     3. Mega-Menú Desplegable de Colecciones y Guía de Siluetas de Tickets ($50-$500)
+     1. Header Principal Responsive (Logo Oficial Market Store + Menú Editorial + Buscador/Bolsa/Tickets)
+     2. Mega-Menú Desplegable de Colecciones y Guía de Siluetas de Tickets ($50-$500)
      ============================================================================ -->
 
-<!-- 1. TOP PROMO & ANNOUNCEMENT BAR (ESTILO NEWERA.MX) -->
-<div class="ne-promo-bar">
-  <div class="ne-promo-inner">
-    <div class="ne-promo-left">
-      <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="ne-promo-mark" />
-      <span class="ne-promo-pill">OFICIAL</span>
-    </div>
-    <div class="ne-promo-right">
-      <span class="ne-sep">|</span>
-      <button type="button" class="ne-top-link" (click)="goToWallet()">
-        PODER DE COMPRA: <strong>{{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
-      </button>
-      <span class="ne-sep">|</span>
-      <div class="ne-role-toggle">
-        <button
-          type="button"
-          [class.active]="market.currentUser()?.role === 'buyer'"
-          (click)="switchRole('buyer')"
-        >
-          COMPRADOR
-        </button>
-        <button
-          type="button"
-          [class.active]="market.currentUser()?.role === 'seller'"
-          (click)="switchRole('seller')"
-        >
-          VENDEDOR
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 2. HEADER PRINCIPAL STICKY ESTILO NEW ERA MX CON MATERIAL TRANSLÚCIDO iOS -->
+<!-- HEADER PRINCIPAL STICKY ESTILO NEW ERA MX CON MATERIAL TRANSLÚCIDO iOS -->
 <header class="ne-header ios-translucent">
   <div class="ne-header-inner">
     <!-- IZQUIERDA: Botón Hamburguesa Móvil + Logo Oficial Market Store (Variante 1 Horizontal + Variante 2 Icono) -->

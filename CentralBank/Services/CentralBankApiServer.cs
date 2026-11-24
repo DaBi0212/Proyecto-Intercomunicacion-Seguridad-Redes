@@ -43,7 +43,11 @@ public class CentralBankApiServer : IDisposable
     private bool _isRunning;
 
     public const string DiscoveryChannelUrl = "https://ntfy.sh/aetherpay_cb_dabi0212_net";
+    public const string BackupDiscoveryChannelUrl = "https://ntfy.sh/marketstore_cb_dabi0212_v2";
     public const string VercelStoreProductionUrl = "https://proyecto-intercomunicacion-segurida.vercel.app";
+
+    private string _lastGitPublishedHttpsUrl = string.Empty;
+    private DateTime _lastNtfyPublishedAt = DateTime.MinValue;
 
     public const int DefaultPort = 7070;
     public string BaseUrl { get; } = $"http://0.0.0.0:{DefaultPort}/";
@@ -240,11 +244,11 @@ public class CentralBankApiServer : IDisposable
             _ = Task.Run(() => ReadStreamAsync(_tunnelProcess.StandardError), token);
             _ = Task.Run(() => ReadStreamAsync(_tunnelProcess.StandardOutput), token);
 
-            // Republicar periódicamente cada 45 segundos para mantener fresco el descubrimiento automático
+            // Republicar periódicamente cada 5 minutos para no exceder límites de ntfy.sh
             while (!token.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(45), token);
-                await PublishDiscoveryEndpointsAsync(PublicHttpsTunnelUrl);
+                await Task.Delay(TimeSpan.FromMinutes(5), token);
+                await PublishDiscoveryEndpointsAsync(PublicHttpsTunnelUrl, forcePublish: false);
             }
         }
         catch
@@ -253,7 +257,7 @@ public class CentralBankApiServer : IDisposable
         }
     }
 
-    private async Task PublishDiscoveryEndpointsAsync(string httpsApiUrl)
+    private async Task PublishDiscoveryEndpointsAsync(string httpsApiUrl, bool forcePublish = true)
     {
         try
         {
@@ -271,7 +275,8 @@ public class CentralBankApiServer : IDisposable
             };
             var json = JsonSerializer.Serialize(payloadObj);
 
-            // 1. Guardar archivo local bank-discovery.json en la raíz del repositorio (para GitHub raw / Auto-Sync)
+            // 1. Guardar archivo local bank-discovery.json en la raíz del repositorio y sincronizarlo con GitHub raw
+            // cuando se obtiene una nueva URL de túnel HTTPS (para que GitHub API y GitHub Raw siempre tengan el túnel activo)
             try
             {
                 var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
@@ -279,7 +284,15 @@ public class CentralBankApiServer : IDisposable
                 {
                     if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
                     {
-                        await File.WriteAllTextAsync(Path.Combine(dir.FullName, "bank-discovery.json"), json, Encoding.UTF8);
+                        var discoveryPath = Path.Combine(dir.FullName, "bank-discovery.json");
+                        await File.WriteAllTextAsync(discoveryPath, json, Encoding.UTF8);
+
+                        if (!string.IsNullOrWhiteSpace(httpsApiUrl) &&
+                            !string.Equals(_lastGitPublishedHttpsUrl, httpsApiUrl, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _lastGitPublishedHttpsUrl = httpsApiUrl;
+                            _ = Task.Run(() => TryPushDiscoveryToGitHubRepository(dir.FullName));
+                        }
                         break;
                     }
                     dir = dir.Parent;
@@ -287,10 +300,50 @@ public class CentralBankApiServer : IDisposable
             }
             catch { }
 
-            // 2. Publicar instantáneamente en canal de descubrimiento HTTPS sin configuración
+            // 2. Publicar en los canales de descubrimiento HTTPS con control de frecuencia para evitar HTTP 429
+            if (!forcePublish && (DateTime.UtcNow - _lastNtfyPublishedAt).TotalMinutes < 4.5)
+            {
+                return;
+            }
+            _lastNtfyPublishedAt = DateTime.UtcNow;
+
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            using var content = new StringContent(json, Encoding.UTF8, "text/plain");
-            await http.PostAsync(DiscoveryChannelUrl, content);
+            foreach (var channel in new[] { DiscoveryChannelUrl, BackupDiscoveryChannelUrl })
+            {
+                try
+                {
+                    using var content = new StringContent(json, Encoding.UTF8, "text/plain");
+                    await http.PostAsync(channel, content);
+                }
+                catch { }
+            }
+        }
+        catch { }
+    }
+
+    private static void TryPushDiscoveryToGitHubRepository(string repoRoot)
+    {
+        try
+        {
+            void RunGit(string args)
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = args,
+                    WorkingDirectory = repoRoot,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using var p = Process.Start(psi);
+                p?.WaitForExit(8000);
+            }
+
+            RunGit("add bank-discovery.json");
+            RunGit("commit -m \"chore: auto-sync active CentralBank tunnel endpoint [skip ci]\" --only bank-discovery.json");
+            RunGit("push origin main");
         }
         catch { }
     }
