@@ -45,7 +45,7 @@ type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
             type="button"
             class="ne-filter-trigger apple-pressable"
             [class.active]="filterDrawerOpen() || hasActiveFilters()"
-            (click)="filterDrawerOpen.update((v) => !v)"
+            (click)="filterDrawerOpen.set(!filterDrawerOpen())"
           >
             <svg class="ne-sliders-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
               <line x1="4" y1="7" x2="20" y2="7" />
