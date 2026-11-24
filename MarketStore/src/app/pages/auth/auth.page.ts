@@ -46,12 +46,21 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       <main class="auth-grid">
         <!-- Columna izquierda (en Desktop): Contexto del Ecosistema MarketStore + WalletPay -->
         <section class="ecosystem-showcase continuous">
+          <div class="eco-brand-banner continuous">
+            <img
+              src="assets/logos/marketstore-horizontal.png"
+              alt="Market Store"
+              class="eco-horizontal-logo"
+            />
+            <span class="eco-official-tag">TIENDA OFICIAL · COLECCIONES</span>
+          </div>
+
           <div class="eco-header">
-            <span class="eco-eyebrow">COMERCIO ELECTRÓNICO MULTI-USUARIO</span>
-            <h2>Compra y vende con Tickets Electrónicos del Banco Central.</h2>
+            <span class="eco-eyebrow">EXPERIENCIA DE COMPRA · RED WALLETPAY</span>
+            <h2>Explora nuestras colecciones y paga al instante con tus Tickets del Banco Central.</h2>
             <p>
-              Cualquier persona puede ingresar con su propia cuenta de <strong>WalletPay</strong>,
-              sincronizar sus tickets personales y solicitar la verificación y aprobación de sus compras ante el Banco Central.
+              Ingresa con tu cuenta de <strong>WalletPay</strong> para explorar lanzamientos, filtrar por silueta de ticket
+              y liquidar tus pedidos con validación automática del Banco Central.
             </p>
           </div>
 
@@ -109,20 +118,15 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
         <!-- Columna derecha: Tarjeta de Control de Acceso Multi-Usuario tipo iOS -->
         <section class="auth-card continuous">
           <div class="brand">
-            <div class="app-icon continuous" aria-hidden="true">
-              <span class="pass p1"></span>
-              <span class="pass p2"></span>
-              <span class="pass p3"></span>
-              <span class="pocket">
-                <sf-symbol name="bag.fill" [size]="18" />
-              </span>
+            <div class="app-icon-logo continuous" aria-hidden="true">
+              <img src="assets/logos/marketstore-icon.png" alt="Market Store Icono" />
             </div>
-            <h1>MarketStore</h1>
+            <h1>Market Store</h1>
             <p>
               {{
                 selectedRole() === 'buyer'
                   ? 'Selecciona tu cuenta personal o registra una nueva persona para comprar con tus tickets de WalletPay.'
-                  : 'Inicia sesión como Vendedor para gestionar el catálogo y auditar órdenes.'
+                  : 'Inicia sesión como Vendedor para gestionar colecciones, inventario y auditar órdenes.'
               }}
             </p>
           </div>
@@ -446,12 +450,57 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
 
     .ecosystem-showcase {
       --r: 28px;
-      padding: 34px;
+      padding: 30px;
       background: var(--ios-cell);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 26px;
+      gap: 22px;
+    }
+
+    .eco-brand-banner {
+      --r: 18px;
+      padding: 12px 16px;
+      background: #2B70EA;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 8px 22px rgba(43, 112, 234, 0.25);
+    }
+    .eco-horizontal-logo {
+      height: 44px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .eco-official-tag {
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .app-icon-logo {
+      --r: 20px;
+      width: 74px;
+      height: 74px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      background: #2B70EA;
+      box-shadow: 0 10px 24px rgba(43, 112, 234, 0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .app-icon-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .eco-eyebrow {
