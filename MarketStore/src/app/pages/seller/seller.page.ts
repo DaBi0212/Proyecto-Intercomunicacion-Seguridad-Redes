@@ -108,60 +108,78 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       <!-- PESTAÑA 1: INVENTARIO DE PRODUCTOS -->
       @if (tab() === 'inventory') {
         <section class="inventory-section">
-          <div class="inv-grid">
-            @for (p of market.products(); track p.id) {
-              <article class="inv-card continuous" [class.paused]="!p.active">
-                <div class="inv-top">
-                  <div class="inv-thumb continuous" [class]="'inv-thumb continuous ' + p.surfaceClass">
-                    <sf-symbol [name]="p.symbolName" [size]="28" />
-                  </div>
-                  <div class="inv-title-wrap">
-                    <div class="inv-badges">
-                      <span class="sku-pill mono">{{ p.sku }}</span>
-                      <span class="state-pill" [class.off]="!p.active">
-                        {{ p.active ? 'En venta' : 'Pausado' }}
-                      </span>
+          @if (market.products().length === 0) {
+            <div class="empty-inv-card continuous">
+              <div class="eic-icon continuous">
+                <sf-symbol name="photo.on.rectangle" [size]="34" />
+              </div>
+              <h3>El catálogo está vacío</h3>
+              <p>Publica tus propios productos subiendo sus fotografías o imágenes oficiales para mostrarlos en Market Store.</p>
+              <button type="button" class="new-prod-btn continuous apple-pressable" (click)="openProductModal()">
+                <sf-symbol name="plus" [size]="16" [weight]="2.6" />
+                <span>Subir Imagen y Publicar Producto</span>
+              </button>
+            </div>
+          } @else {
+            <div class="inv-grid">
+              @for (p of market.products(); track p.id) {
+                <article class="inv-card continuous" [class.paused]="!p.active">
+                  <div class="inv-top">
+                    <div class="inv-thumb continuous" [class]="'inv-thumb continuous ' + p.surfaceClass">
+                      @if (p.imageUrl) {
+                        <img [src]="p.imageUrl" [alt]="p.title" class="inv-thumb-img" />
+                      } @else {
+                        <sf-symbol [name]="p.symbolName" [size]="28" />
+                      }
                     </div>
-                    <h3>{{ p.title }}</h3>
-                    <span class="inv-cat">{{ p.categoryLabel }} · Equivalencia: {{ p.badge }}</span>
+                    <div class="inv-title-wrap">
+                      <div class="inv-badges">
+                        <span class="sku-pill mono">{{ p.sku }}</span>
+                        <span class="state-pill" [class.off]="!p.active">
+                          {{ p.active ? 'En venta' : 'Pausado' }}
+                        </span>
+                      </div>
+                      <h3>{{ p.title }}</h3>
+                      <span class="inv-cat">{{ p.categoryLabel }} · Equivalencia: {{ p.badge }}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div class="inv-metrics">
-                  <div>
-                    <span class="m-lbl">PRECIO OFICIAL</span>
-                    <strong class="m-val">{{ p.price | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
+                  <div class="inv-metrics">
+                    <div>
+                      <span class="m-lbl">PRECIO OFICIAL</span>
+                      <strong class="m-val">{{ p.price | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
+                    </div>
+                    <div>
+                      <span class="m-lbl">INVENTARIO</span>
+                      <strong class="m-val" [class.low]="p.stock <= 5">{{ p.stock }} unidades</strong>
+                    </div>
                   </div>
-                  <div>
-                    <span class="m-lbl">INVENTARIO</span>
-                    <strong class="m-val" [class.low]="p.stock <= 5">{{ p.stock }} unidades</strong>
-                  </div>
-                </div>
 
-                <div class="inv-actions">
-                  <button type="button" class="act-btn continuous apple-pressable" (click)="editProduct(p)">
-                    <sf-symbol name="pencil" [size]="14" />
-                    <span>Editar</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="act-btn continuous apple-pressable"
-                    (click)="market.toggleProductActive(p.id)"
-                  >
-                    <span>{{ p.active ? 'Pausar' : 'Activar' }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="act-btn danger continuous apple-pressable"
-                    (click)="market.deleteProduct(p.id)"
-                    aria-label="Eliminar producto"
-                  >
-                    <sf-symbol name="trash" [size]="14" />
-                  </button>
-                </div>
-              </article>
-            }
-          </div>
+                  <div class="inv-actions">
+                    <button type="button" class="act-btn continuous apple-pressable" (click)="editProduct(p)">
+                      <sf-symbol name="pencil" [size]="14" />
+                      <span>Editar</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="act-btn continuous apple-pressable"
+                      (click)="market.toggleProductActive(p.id)"
+                    >
+                      <span>{{ p.active ? 'Pausar' : 'Activar' }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="act-btn danger continuous apple-pressable"
+                      (click)="market.deleteProduct(p.id)"
+                      aria-label="Eliminar producto"
+                    >
+                      <sf-symbol name="trash" [size]="14" />
+                    </button>
+                  </div>
+                </article>
+              }
+            </div>
+          }
         </section>
       }
 
@@ -313,14 +331,84 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
           </div>
 
           <div class="modal-body">
+            <!-- SECCIÓN DE SUBIDA DE IMÁGENES DEL PRODUCTO -->
+            <div class="img-upload-section continuous">
+              <div class="ius-head">
+                <div>
+                  <strong>Imágenes del Producto</strong>
+                  <span>Sube una o varias fotos desde tu dispositivo para mostrarlas en el catálogo.</span>
+                </div>
+                <label class="ius-upload-btn continuous apple-pressable">
+                  <sf-symbol name="plus" [size]="14" [weight]="2.6" />
+                  <span>Subir Imagen</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    (change)="onProductImagesSelected($event)"
+                  />
+                </label>
+              </div>
+
+              @if (formImages().length === 0) {
+                <label class="ius-dropzone continuous apple-pressable">
+                  <sf-symbol name="photo.on.rectangle" [size]="30" />
+                  <strong>Toca aquí para seleccionar fotos del producto</strong>
+                  <span>Formatos soportados: JPG, PNG, WEBP · Puedes elegir varias imágenes</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    (change)="onProductImagesSelected($event)"
+                  />
+                </label>
+              } @else {
+                <div class="ius-gallery">
+                  @for (img of formImages(); track $index; let idx = $index) {
+                    <div
+                      class="ius-thumb continuous"
+                      [class.is-main]="formMainImage() === img"
+                      (click)="setMainImage(img)"
+                    >
+                      <img [src]="img" alt="Vista previa del producto" />
+                      @if (formMainImage() === img) {
+                        <span class="ius-main-badge">PORTADA</span>
+                      }
+                      <button
+                        type="button"
+                        class="ius-remove-btn"
+                        title="Quitar imagen"
+                        (click)="$event.stopPropagation(); removeUploadedImage(idx)"
+                      >
+                        <sf-symbol name="xmark" [size]="10" [weight]="2.8" />
+                      </button>
+                    </div>
+                  }
+                  <label class="ius-add-more continuous apple-pressable" title="Agregar otra imagen">
+                    <sf-symbol name="plus" [size]="20" />
+                    <span>Agregar</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      hidden
+                      (change)="onProductImagesSelected($event)"
+                    />
+                  </label>
+                </div>
+              }
+            </div>
+
             <div class="ios-form-group continuous">
               <label class="f-row">
                 <span>Título</span>
-                <input type="text" placeholder="Ej. Base MagSafe Duo" [(ngModel)]="formTitle" />
+                <input type="text" placeholder="Ej. Gorra New Era 59FIFTY / Base MagSafe" [(ngModel)]="formTitle" />
               </label>
               <label class="f-row">
                 <span>Subtítulo</span>
-                <input type="text" placeholder="Ej. Carga plegable de viaje 20 W" [(ngModel)]="formSubtitle" />
+                <input type="text" placeholder="Ej. Edición oficial verificada" [(ngModel)]="formSubtitle" />
               </label>
               <label class="f-row">
                 <span>Categoría</span>
@@ -339,18 +427,6 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
               <label class="f-row">
                 <span>Stock</span>
                 <input type="number" min="1" [(ngModel)]="formStock" />
-              </label>
-              <label class="f-row">
-                <span>Ícono SF</span>
-                <select [(ngModel)]="formSymbol">
-                  <option value="bolt.fill">Rayo MagSafe (bolt.fill)</option>
-                  <option value="headphones">Audio (headphones)</option>
-                  <option value="speaker.wave.2">Bocina (speaker.wave.2)</option>
-                  <option value="laptopcomputer">Estudio (laptopcomputer)</option>
-                  <option value="watch">Wearable (watch)</option>
-                  <option value="sparkles">UWB / Inteligente (sparkles)</option>
-                  <option value="shield.checkered">Seguridad Digital (shield.checkered)</option>
-                </select>
               </label>
             </div>
 
@@ -519,6 +595,173 @@ import { SfSymbolComponent } from '../../shared/sf-symbol.component';
       align-items: center;
       justify-content: center;
       color: var(--ion-color-primary);
+      overflow: hidden;
+    }
+    .inv-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .empty-inv-card {
+      --r: 22px;
+      padding: 48px 24px;
+      background: var(--ios-cell);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .eic-icon {
+      --r: 18px;
+      width: 64px;
+      height: 64px;
+      background: rgba(0, 122, 255, 0.14);
+      color: var(--ion-color-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .empty-inv-card h3 {
+      margin: 4px 0 0;
+      font-size: 20px;
+    }
+    .empty-inv-card p {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: var(--ios-label-2);
+      max-width: 420px;
+    }
+
+    /* Subida de imágenes en el modal */
+    .img-upload-section {
+      --r: 16px;
+      padding: 14px;
+      background: var(--ios-sheet-cell);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ius-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .ius-head div {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ius-head strong {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .ius-head span {
+      font-size: 11.5px;
+      color: var(--ios-label-2);
+    }
+    .ius-upload-btn {
+      --r: 10px;
+      height: 34px;
+      padding: 0 12px;
+      background: rgba(0, 122, 255, 0.14);
+      color: var(--ion-color-primary);
+      font-size: 12.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .ius-dropzone {
+      --r: 14px;
+      padding: 22px 16px;
+      border: 1.5px dashed var(--ios-separator);
+      background: var(--ios-cell);
+      color: var(--ios-label-2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+    .ius-dropzone strong {
+      font-size: 13.5px;
+      color: var(--ios-label);
+    }
+    .ius-dropzone span {
+      font-size: 11.5px;
+    }
+    .ius-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+      gap: 10px;
+    }
+    .ius-thumb {
+      --r: 12px;
+      position: relative;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border: 2px solid transparent;
+      background: var(--ios-cell);
+      cursor: pointer;
+    }
+    .ius-thumb.is-main {
+      border-color: var(--ion-color-primary);
+    }
+    .ius-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .ius-main-badge {
+      position: absolute;
+      left: 5px;
+      bottom: 5px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--ion-color-primary);
+      color: #fff;
+      font-size: 8.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+    .ius-remove-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 0;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+    .ius-add-more {
+      --r: 12px;
+      aspect-ratio: 1;
+      border: 1.5px dashed var(--ios-separator);
+      background: var(--ios-cell);
+      color: var(--ios-label-2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
     }
     .inv-title-wrap {
       flex: 1;
@@ -953,6 +1196,8 @@ export class SellerPage {
   formPrice = 150;
   formStock = 15;
   formSymbol = 'bolt.fill';
+  readonly formImages = signal<string[]>([]);
+  readonly formMainImage = signal<string>('');
 
   readonly inspectedTicket = computed<BankTicket | null>(() => {
     const remote = this.bankVerifiedTicket();
@@ -989,6 +1234,8 @@ export class SellerPage {
     this.formPrice = 150;
     this.formStock = 15;
     this.formSymbol = 'bolt.fill';
+    this.formImages.set([]);
+    this.formMainImage.set('');
     this.modalOpen.set(true);
   }
 
@@ -1002,7 +1249,86 @@ export class SellerPage {
     this.formPrice = p.price;
     this.formStock = p.stock;
     this.formSymbol = p.symbolName;
+    const imgs = p.images && p.images.length > 0 ? [...p.images] : p.imageUrl ? [p.imageUrl] : [];
+    this.formImages.set(imgs);
+    this.formMainImage.set(p.imageUrl || imgs[0] || '');
     this.modalOpen.set(true);
+  }
+
+  async onProductImagesSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement | null;
+    if (!input?.files || input.files.length === 0) return;
+    const files = Array.from(input.files);
+    const loaded: string[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        const dataUrl = await this.resizeImageToDataUrl(file, 760, 0.85);
+        if (dataUrl) loaded.push(dataUrl);
+      } catch {}
+    }
+    if (loaded.length > 0) {
+      const updated = [...this.formImages(), ...loaded];
+      this.formImages.set(updated);
+      if (!this.formMainImage()) {
+        this.formMainImage.set(updated[0]);
+      }
+      this.market.haptic('selection');
+    }
+    input.value = '';
+  }
+
+  setMainImage(img: string): void {
+    this.formMainImage.set(img);
+    this.market.haptic('selection');
+  }
+
+  removeUploadedImage(index: number): void {
+    const current = this.formImages();
+    const removed = current[index];
+    const next = current.filter((_, idx) => idx !== index);
+    this.formImages.set(next);
+    if (this.formMainImage() === removed) {
+      this.formMainImage.set(next[0] || '');
+    }
+    this.market.haptic('light');
+  }
+
+  private resizeImageToDataUrl(file: File, maxDim = 760, quality = 0.85): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Formato de imagen inválido'));
+        img.onload = () => {
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(reader.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, w, h);
+          const outMime = file.type === 'image/png' ? 'image/webp' : 'image/jpeg';
+          resolve(canvas.toDataURL(outMime, quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   async saveProduct(): Promise<void> {
@@ -1016,10 +1342,13 @@ export class SellerPage {
       digital: 'prod-surface-emerald'
     };
 
+    const imgs = this.formImages();
+    const mainImg = this.formMainImage() || imgs[0] || undefined;
+
     await this.market.createOrUpdateProduct({
       id: this.editingId(),
       title: this.formTitle.trim(),
-      subtitle: this.formSubtitle.trim() || 'Edición oficial verificada MarketStore',
+      subtitle: this.formSubtitle.trim() || 'Edición oficial verificada Market Store',
       description:
         this.formDesc.trim() ||
         'Producto oficial disponible para compra con tickets electrónicos emitidos por el Banco Central.',
@@ -1028,6 +1357,8 @@ export class SellerPage {
       stock: Math.max(0, Number(this.formStock) || 10),
       symbolName: this.formSymbol,
       surfaceClass: surfaceMap[this.formCategory],
+      imageUrl: mainImg,
+      images: imgs,
       specs: [
         'Pago verificado con Tickets del Banco Central',
         'Envío asegurado sin costo adicional',

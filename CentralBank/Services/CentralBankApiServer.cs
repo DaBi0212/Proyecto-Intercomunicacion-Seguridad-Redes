@@ -30,7 +30,7 @@ namespace CentralBank.Services;
 /// </summary>
 public class CentralBankApiServer : IDisposable
 {
-    private const int MaxRequestBytes = 262_144;
+    private const int MaxRequestBytes = 8_388_608;
     private const long MaxClockSkewMs = 5 * 60 * 1000;
 
     private readonly CentralBankStateService _state;
@@ -858,6 +858,26 @@ public class CentralBankApiServer : IDisposable
                 return (200, new { ok = true, savedCardsJson = updatedJson });
             }
 
+            case "catalog.products.save":
+            {
+                if (!session.IsAuthenticated || session.UserEmail == null)
+                    return (401, new { ok = false, code = "UNAUTHORIZED", error = "Inicia sesión para actualizar el catálogo." });
+
+                var productsJson = "[]";
+                if (payload.TryGetProperty("products", out var prodsEl))
+                {
+                    productsJson = prodsEl.GetRawText();
+                }
+                else
+                {
+                    productsJson = GetStringProp(payload, "productsJson", "[]");
+                }
+
+                var savedJson = _state.SaveMarketStoreProductsJson(productsJson);
+                _state.AddAuditLog("STORE", "#007AFF", $"[Catálogo MarketStore] {session.UserEmail} actualizó el catálogo de productos.");
+                return (200, new { ok = true, productsJson = savedJson });
+            }
+
             case "state.sync":
             {
                 if (!session.IsAuthenticated || session.UserEmail == null)
@@ -900,7 +920,8 @@ public class CentralBankApiServer : IDisposable
                     tickets,
                     ticketRequests,
                     transactions = txs,
-                    orders
+                    orders,
+                    productsJson = _state.GetMarketStoreProductsJson()
                 });
             }
 
@@ -1236,7 +1257,8 @@ public class CentralBankApiServer : IDisposable
             users = new[] { MapUserForDirectory(user) },
             tickets = userTickets,
             ticketRequests = userTicketRequests,
-            transactions = userTxs
+            transactions = userTxs,
+            productsJson = _state.GetMarketStoreProductsJson()
         };
     }
 

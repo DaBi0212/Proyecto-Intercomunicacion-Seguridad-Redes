@@ -245,29 +245,42 @@ type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
       @if (filteredProducts().length === 0) {
         <div class="ne-empty-state continuous">
           <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nes-logo" />
-          <h3>No encontramos artículos con esos filtros</h3>
-          <p>Prueba seleccionando otra categoría o restablece los filtros activos.</p>
-          <button type="button" class="btn-primary continuous apple-pressable" (click)="resetFilters()">
-            Mostrar todos los productos
-          </button>
+          @if (market.products().length === 0) {
+            <h3>El catálogo está vacío</h3>
+            <p>Sube imágenes de tus productos y publícalos para que aparezcan en el catálogo de Market Store.</p>
+            <button type="button" class="btn-primary continuous apple-pressable" (click)="goToPublishProduct()">
+              <sf-symbol name="plus" [size]="16" [weight]="2.6" />
+              <span>Subir Imágenes y Publicar Producto</span>
+            </button>
+          } @else {
+            <h3>No encontramos artículos con esos filtros</h3>
+            <p>Prueba seleccionando otra categoría o restablece los filtros activos.</p>
+            <button type="button" class="btn-primary continuous apple-pressable" (click)="resetFilters()">
+              Mostrar todos los productos
+            </button>
+          }
         </div>
       } @else {
         <section class="ne-product-grid" [class.single-col]="gridMode() === 'single'">
           @for (p of filteredProducts(); track p.id) {
             <article class="ne-card continuous">
-              <!-- Contenedor visual del producto con icono/sello en esquina superior derecha -->
+              <!-- Contenedor visual del producto con imagen real subida o icono + sello en esquina superior derecha -->
               <div
                 class="ne-card-visual continuous apple-pressable"
                 [class]="'ne-card-visual continuous apple-pressable ' + p.surfaceClass"
                 (click)="openDetail(p)"
               >
+                @if (p.imageUrl) {
+                  <img [src]="p.imageUrl" [alt]="p.title" class="ne-card-img" />
+                } @else {
+                  <div class="ne-card-glyph" [style.color]="p.accentColor">
+                    <sf-symbol [name]="p.symbolName" [size]="52" [weight]="1.55" />
+                  </div>
+                }
+
                 <span class="ne-corner-seal" title="Ver detalle del producto">
                   <img src="assets/logos/marketstore-icon.png" alt="Market Store" />
                 </span>
-
-                <div class="ne-card-glyph" [style.color]="p.accentColor">
-                  <sf-symbol [name]="p.symbolName" [size]="52" [weight]="1.55" />
-                </div>
               </div>
 
               <!-- Línea divisoria horizontal estilo New Era MX (debajo del producto) -->
@@ -360,9 +373,33 @@ type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
 
           <div class="detail-content">
             <div class="detail-visual continuous" [class]="'detail-visual continuous ' + prod.surfaceClass">
-              <div class="dv-glyph" [style.color]="prod.accentColor">
-                <sf-symbol [name]="prod.symbolName" [size]="68" [weight]="1.6" />
-              </div>
+              @if (activeDetailImage() || prod.imageUrl) {
+                <img
+                  [src]="activeDetailImage() || prod.imageUrl"
+                  [alt]="prod.title"
+                  class="detail-main-img continuous"
+                />
+              } @else {
+                <div class="dv-glyph" [style.color]="prod.accentColor">
+                  <sf-symbol [name]="prod.symbolName" [size]="68" [weight]="1.6" />
+                </div>
+              }
+
+              @if (prod.images && prod.images.length > 1) {
+                <div class="dv-thumbs">
+                  @for (img of prod.images; track $index) {
+                    <button
+                      type="button"
+                      class="dv-thumb continuous apple-pressable"
+                      [class.active]="(activeDetailImage() || prod.imageUrl) === img"
+                      (click)="activeDetailImage.set(img)"
+                    >
+                      <img [src]="img" [alt]="prod.title" />
+                    </button>
+                  }
+                </div>
+              }
+
               <div class="dv-badges">
                 <span class="dv-badge">{{ prod.categoryLabel }}</span>
                 <span class="dv-badge mono">{{ prod.sku }}</span>
@@ -642,6 +679,43 @@ type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+    .ne-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .detail-main-img {
+      --r: 14px;
+      width: 100%;
+      max-height: 280px;
+      object-fit: contain;
+      display: block;
+    }
+    .dv-thumbs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .dv-thumb {
+      --r: 8px;
+      width: 48px;
+      height: 48px;
+      padding: 0;
+      border: 2px solid transparent;
+      overflow: hidden;
+      background: var(--ios-sheet-cell);
+    }
+    .dv-thumb.active {
+      border-color: var(--ion-color-primary);
+    }
+    .dv-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     /* Línea divisoria horizontal debajo de la imagen (igual que en la captura) */
@@ -1271,6 +1345,7 @@ export class CatalogPage {
   readonly selectedCategory = this.market.selectedCategory;
   readonly onlyAffordable = this.market.onlyAffordable;
   readonly selectedProduct = signal<Product | null>(null);
+  readonly activeDetailImage = signal<string>('');
 
   readonly selectedDenom = signal<TicketDenomination | null>(null);
   readonly onlyInStock = signal<boolean>(false);
@@ -1388,7 +1463,14 @@ export class CatalogPage {
 
   openDetail(p: Product): void {
     this.market.haptic('light');
+    this.activeDetailImage.set(p.imageUrl || (p.images && p.images[0]) || '');
     this.selectedProduct.set(p);
+  }
+
+  goToPublishProduct(): void {
+    this.market.haptic('selection');
+    this.market.switchRole('seller');
+    this.router.navigateByUrl('/seller');
   }
 
   addToBag(p: Product): void {

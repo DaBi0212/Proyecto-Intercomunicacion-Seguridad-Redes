@@ -100,6 +100,8 @@ export interface Product {
   surfaceClass: string;
   accentColor: string;
   symbolName: string;
+  imageUrl?: string;
+  images?: string[];
   specs: string[];
   sellerId: string;
   sellerName: string;

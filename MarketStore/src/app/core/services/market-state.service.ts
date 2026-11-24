@@ -83,193 +83,11 @@ export class MarketStateService {
    */
   readonly tickets = signal<BankTicket[]>([]);
 
-  /** Catálogo de Productos de la Tienda Virtual disponibles para compra */
-  readonly products = signal<Product[]>([
-    {
-      id: 'PRD-101',
-      sku: 'MS-MAG-100',
-      title: 'Cargador Magnético MagCharge Qi2',
-      subtitle: 'Alineación magnética perfecta · Carga rápida 15 W',
-      description:
-        'Diseñado en aluminio anodizado con cable trenzado de 1.5 m. Compatible con toda la línea iPhone y estuches magnéticos.',
-      category: 'magsafe',
-      categoryLabel: 'Accesorios MagSafe',
-      price: 100,
-      stock: 18,
-      rating: 4.9,
-      reviewsCount: 142,
-      badge: '1 Ticket $100',
-      surfaceClass: 'prod-surface-blue',
-      accentColor: '#007AFF',
-      symbolName: 'bolt.fill',
-      specs: ['Potencia 15 W Qi2 certificada', 'Cuerpo de aluminio reciclado', 'Cable trenzado USB-C de 1.5 m'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [100]
-    },
-    {
-      id: 'PRD-102',
-      sku: 'MS-AUD-200',
-      title: 'Auriculares StudioPods Spatial',
-      subtitle: 'Audio espacial personalizado con cancelación activa',
-      description:
-        'Sonido de alta fidelidad con ecualización adaptativa, resistencia al agua IPX4 y estuche de carga con precisión UWB.',
-      category: 'audio',
-      categoryLabel: 'Audio y Música',
-      price: 200,
-      stock: 12,
-      rating: 4.95,
-      reviewsCount: 289,
-      badge: '1 Ticket $200',
-      surfaceClass: 'prod-surface-purple',
-      accentColor: '#7C3AED',
-      symbolName: 'headphones',
-      specs: ['Cancelación Activa de Ruido 2x', 'Hasta 30 h de batería con estuche', 'Audio Espacial con seguimiento dinámico'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [200]
-    },
-    {
-      id: 'PRD-103',
-      sku: 'MS-TAG-050',
-      title: 'Localizador Inteligente AetherTag UWB',
-      subtitle: 'Rastreo de precisión milimétrica en la red Encontrar',
-      description:
-        'Encuentra tus llaves, mochila o equipaje al instante con indicaciones visuales y bocina integrada de alta claridad.',
-      category: 'magsafe',
-      categoryLabel: 'Accesorios MagSafe',
-      price: 50,
-      stock: 34,
-      rating: 4.8,
-      reviewsCount: 96,
-      badge: '1 Ticket $50',
-      surfaceClass: 'prod-surface-emerald',
-      accentColor: '#34C759',
-      symbolName: 'sparkles',
-      specs: ['Chip de banda ultraancha UWB', 'Batería CR2032 reemplazable (1 año)', 'Resistencia al agua y polvo IP67'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [50]
-    },
-    {
-      id: 'PRD-104',
-      sku: 'MS-HOM-150',
-      title: 'Bocina Inteligente HomeSphere Mini',
-      subtitle: 'Acústica de 360° y hub de automatización Matter',
-      description:
-        'Llena cualquier habitación con graves profundos y agudos nítidos. Controla tus accesorios inteligentes con privacidad total.',
-      category: 'hogar',
-      categoryLabel: 'Hogar Inteligente',
-      price: 150,
-      stock: 9,
-      rating: 4.85,
-      reviewsCount: 74,
-      badge: 'Tickets $100 + $50',
-      surfaceClass: 'prod-surface-amber',
-      accentColor: '#EA580C',
-      symbolName: 'speaker.wave.2',
-      specs: ['Audio computacional 360°', 'Sensor de temperatura y humedad', 'Thread Border Router + Matter'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [100, 50]
-    },
-    {
-      id: 'PRD-105',
-      sku: 'MS-EST-500',
-      title: 'Monitor Studio Display Mini LED 27"',
-      subtitle: 'Panel Retina 5K · 120 Hz ProMotion · Cuerpo de aluminio',
-      description:
-        'Calibrado de fábrica para diseño y desarrollo profesional con cámara ultra gran angular de 12 MP y 6 altavoces.',
-      category: 'estudio',
-      categoryLabel: 'Cómputo y Estudio',
-      price: 500,
-      stock: 5,
-      rating: 5.0,
-      reviewsCount: 61,
-      badge: '1 Ticket Titanium $500',
-      surfaceClass: 'prod-surface-titanium',
-      accentColor: '#5856D6',
-      symbolName: 'laptopcomputer',
-      specs: ['Resolución 5120 × 2880 (218 ppi)', 'Brillo sostenido de 1000 nits (P3)', '3 puertos USB-C + 1 Thunderbolt 4 (96 W)'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [500]
-    },
-    {
-      id: 'PRD-106',
-      sku: 'MS-WAL-100',
-      title: 'Cartera MagSafe en Piel FineWoven',
-      subtitle: 'Soporte para 3 tarjetas con blindaje RFID y Encontrar',
-      description:
-        'Se acopla magnéticamente al dorso de tu dispositivo y te notifica su última ubicación conocida si se separa.',
-      category: 'magsafe',
-      categoryLabel: 'Accesorios MagSafe',
-      price: 100,
-      stock: 21,
-      rating: 4.75,
-      reviewsCount: 53,
-      badge: '1 Ticket $100',
-      surfaceClass: 'prod-surface-rose',
-      accentColor: '#E11D48',
-      symbolName: 'wallet.pass',
-      specs: ['Microsarga reciclada de alta durabilidad', 'Imanes integrados de alta retención', 'Soporte de ubicación en Encontrar'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [100]
-    },
-    {
-      id: 'PRD-107',
-      sku: 'MS-WAT-250',
-      title: 'Correa Milanese Titanium & Dock de Carga',
-      subtitle: 'Malla tejida de titanio grado 5 con cierre magnético',
-      description:
-        'Inspirada en las mallas aeroespaciales, ultraligera e infinitamente ajustable, acompañada de base de carga rápida.',
-      category: 'estudio',
-      categoryLabel: 'Cómputo y Estudio',
-      price: 250,
-      stock: 11,
-      rating: 4.9,
-      reviewsCount: 48,
-      badge: 'Tickets $200 + $50',
-      surfaceClass: 'prod-surface-titanium',
-      accentColor: '#007AFF',
-      symbolName: 'watch',
-      specs: ['Titanio grado 5 resistente a corrosión', 'Cierre magnético de paracaídas', 'Incluye disco de carga rápida USB-C'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [200, 50]
-    },
-    {
-      id: 'PRD-108',
-      sku: 'MS-DIG-050',
-      title: 'Suscripción AetherCloud+ 2 TB (Anual)',
-      subtitle: 'Almacenamiento privado en la nube + Retransmisión privada',
-      description:
-        'Activación inmediata en tu cuenta vinculada. Respaldo automático y protección avanzada de tus archivos.',
-      category: 'digital',
-      categoryLabel: 'Tarjetas y Digital',
-      price: 50,
-      stock: 99,
-      rating: 4.95,
-      reviewsCount: 312,
-      badge: '1 Ticket $50',
-      surfaceClass: 'prod-surface-blue',
-      accentColor: '#0A84FF',
-      symbolName: 'shield.checkered',
-      specs: ['2 TB compartibles con hasta 5 familiares', 'Respaldo continuo multi-dispositivo', 'Ocultar mi Correo y Retransmisión Privada'],
-      sellerId: 'USR-SELLER-01',
-      sellerName: 'Aether Studio Oficial',
-      active: true,
-      recommendedTickets: [50]
-    }
-  ]);
+  /**
+   * Catálogo de Productos de la Tienda Virtual: inicia completamente vacío (sin productos precargados).
+   * Los productos con sus imágenes son publicados por el vendedor y sincronizados con CentralBank.
+   */
+  readonly products = signal<Product[]>([]);
 
   /** Bolsa de compras: inicia completamente vacía (sin datos de prueba) */
   readonly cart = signal<CartItem[]>([]);
@@ -314,9 +132,55 @@ export class MarketStateService {
       if (!this.themeOverridden) this.applyTheme(e.matches);
     });
     this.activeBankUrl.set(this.crypto.getCustomBankUrl());
+    this.loadLocalCatalogProducts();
     this.loadLocalDeviceAccounts();
     this.restorePersistedSession();
     this.fetchRegisteredUsers();
+  }
+
+  private loadLocalCatalogProducts(): void {
+    try {
+      const raw = localStorage.getItem('ms_custom_catalog_products_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.products.set(parsed);
+          return;
+        }
+      }
+    } catch {}
+    this.products.set([]);
+  }
+
+  private saveLocalCatalogProducts(list: Product[]): void {
+    try {
+      localStorage.setItem('ms_custom_catalog_products_v1', JSON.stringify(list));
+    } catch {}
+  }
+
+  private applyServerOrLocalProducts(serverProductsJson?: string): void {
+    if (serverProductsJson && typeof serverProductsJson === 'string') {
+      try {
+        const parsed = JSON.parse(serverProductsJson);
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 || this.products().length === 0) {
+            this.products.set(parsed);
+            this.saveLocalCatalogProducts(parsed);
+          } else if (this.products().length > 0) {
+            this.persistProductsToServer();
+          }
+          return;
+        }
+      } catch {}
+    }
+  }
+
+  private async persistProductsToServer(): Promise<void> {
+    const current = this.products();
+    this.saveLocalCatalogProducts(current);
+    try {
+      await this.crypto.request('catalog.products.save', { products: current });
+    } catch {}
   }
 
   private savePersistedSession(user: UserAccount): void {
@@ -824,6 +688,9 @@ export class MarketStateService {
       if (data.user) {
         this.rememberLocalDeviceAccount({ ...data.user, role: user.role });
         this.applySavedCardsFromServerOrLocal(user.email, data.user.savedCardsJson);
+      }
+      if (typeof data.productsJson === 'string') {
+        this.applyServerOrLocalProducts(data.productsJson);
       }
       if (Array.isArray(data.ticketRequests)) {
         this.ticketRequests.set(data.ticketRequests);
@@ -1348,6 +1215,8 @@ export class MarketStateService {
     stock: number;
     symbolName: string;
     surfaceClass: string;
+    imageUrl?: string;
+    images?: string[];
     specs: string[];
   }): Promise<Product> {
     this.resetInactivityWatchdog();
@@ -1371,6 +1240,13 @@ export class MarketStateService {
         ? `1 Ticket $${recommended[0]}`
         : `Tickets ${recommended.map((r) => '$' + r).join(' + ')}`;
 
+    const normalizedImages = Array.isArray(payload.images)
+      ? payload.images.filter((img) => typeof img === 'string' && img.trim().length > 0)
+      : payload.imageUrl
+      ? [payload.imageUrl]
+      : [];
+    const mainImageUrl = payload.imageUrl || normalizedImages[0] || undefined;
+
     if (payload.id) {
       let updatedProd!: Product;
       this.products.update((list) =>
@@ -1387,6 +1263,8 @@ export class MarketStateService {
             stock: payload.stock,
             symbolName: payload.symbolName,
             surfaceClass: payload.surfaceClass,
+            imageUrl: mainImageUrl,
+            images: normalizedImages,
             specs: payload.specs,
             recommendedTickets: recommended,
             badge: badgeText
@@ -1394,6 +1272,7 @@ export class MarketStateService {
           return updatedProd;
         })
       );
+      await this.persistProductsToServer();
       this.addAuditLog('info', `[Vendedor] Producto ${updatedProd.sku} actualizado ($${payload.price} MXN).`);
       return updatedProd;
     }
@@ -1415,14 +1294,17 @@ export class MarketStateService {
       surfaceClass: payload.surfaceClass,
       accentColor: '#007AFF',
       symbolName: payload.symbolName,
+      imageUrl: mainImageUrl,
+      images: normalizedImages,
       specs: payload.specs.length ? payload.specs : ['Garantía oficial MarketStore', 'Pago verificado con Tickets Bancarios'],
       sellerId: this.currentUser()?.id ?? 'USR-SELLER-01',
-      sellerName: this.currentUser()?.storeName ?? 'Aether Studio Oficial',
+      sellerName: this.currentUser()?.storeName ?? 'Market Store Oficial',
       active: true,
       recommendedTickets: recommended
     };
 
     this.products.update((list) => [newProd, ...list]);
+    await this.persistProductsToServer();
     this.addAuditLog(
       'info',
       `[Vendedor] Nuevo producto publicado: "${newProd.title}" ($${newProd.price} MXN).`
@@ -1435,12 +1317,14 @@ export class MarketStateService {
     this.products.update((list) =>
       list.map((p) => (p.id === productId ? { ...p, active: !p.active } : p))
     );
+    this.persistProductsToServer();
     this.haptic('selection');
   }
 
   deleteProduct(productId: string): void {
     this.products.update((list) => list.filter((p) => p.id !== productId));
     this.cart.update((items) => items.filter((i) => i.product.id !== productId));
+    this.persistProductsToServer();
     this.haptic('light');
   }
 

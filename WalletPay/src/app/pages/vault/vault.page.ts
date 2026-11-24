@@ -514,8 +514,8 @@ type RedeemState = 'idle' | 'verifying' | 'done';
               @if (redeemState() === 'done') {
                 <div class="redeem-done">
                   <sf-symbol class="done-icon" name="checkmark.circle.fill" [size]="56" />
-                  <strong>Abriendo MarketStore en Vercel</strong>
-                  <span>Selecciona tus productos en la tienda; el Banco Central verificará y aprobará tu compra.</span>
+                  <strong>Abriendo MarketStore</strong>
+                  <span>Selecciona tus productos en la tienda.</span>
                 </div>
               } @else {
                 <ion-list [inset]="true">

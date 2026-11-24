@@ -24,16 +24,8 @@ import { SfSymbolComponent } from './sf-symbol.component';
         <div class="ne-promo-left">
           <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="ne-promo-mark" />
           <span class="ne-promo-pill">OFICIAL</span>
-          <span class="ne-promo-text">
-            CANJE INSTANTÁNEO CON TICKETS WALLETPAY ($50 · $100 · $200 · $500 MXN) · VALIDACIÓN AUTOMÁTICA BANCO CENTRAL
-          </span>
         </div>
-
         <div class="ne-promo-right">
-          <span class="ne-bank-status" [class.ok]="market.bankConnected()">
-            <span class="net-dot"></span>
-            {{ market.bankConnected() ? 'BANCO CENTRAL ONLINE' : 'SINCRONIZANDO BANCO…' }}
-          </span>
           <span class="ne-sep">|</span>
           <button type="button" class="ne-top-link" (click)="goToWallet()">
             PODER DE COMPRA: <strong>{{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
@@ -77,7 +69,7 @@ import { SfSymbolComponent } from './sf-symbol.component';
             <!-- Variante 1: Logo Horizontal Oficial con icono de tienda y tipografía Market Store -->
             <div class="ne-logo-horizontal-badge continuous">
               <img
-                src="assets/logos/marketstore-horizontal.png"
+                src="assets/logos/marketstore-horizontal-white.png"
                 alt="Market Store"
                 class="ne-logo-horizontal-img"
               />

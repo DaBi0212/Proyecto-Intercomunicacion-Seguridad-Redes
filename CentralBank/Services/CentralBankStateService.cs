@@ -849,6 +849,15 @@ public class CentralBankStateService
 
     public bool HasAdminPassword => !string.IsNullOrEmpty(GetConfig("admin_password"));
 
+    public string GetMarketStoreProductsJson() => GetConfig("marketstore_products_json") ?? "[]";
+
+    public string SaveMarketStoreProductsJson(string productsJson)
+    {
+        var normalized = string.IsNullOrWhiteSpace(productsJson) ? "[]" : productsJson.Trim();
+        SetConfig("marketstore_products_json", normalized);
+        return normalized;
+    }
+
     public bool SetInitialAdminPassword(string password)
     {
         if (HasAdminPassword || string.IsNullOrEmpty(password) || password.Length < 8) return false;

@@ -68,7 +68,11 @@ type CheckoutStep = 'bag' | 'tickets' | 'verifying' | 'receipt';
                 @for (item of market.cart(); track item.product.id) {
                   <div class="cart-item">
                     <div class="item-thumb continuous" [class]="'item-thumb continuous ' + item.product.surfaceClass">
-                      <sf-symbol [name]="item.product.symbolName" [size]="24" />
+                      @if (item.product.imageUrl) {
+                        <img [src]="item.product.imageUrl" [alt]="item.product.title" class="item-thumb-img" />
+                      } @else {
+                        <sf-symbol [name]="item.product.symbolName" [size]="24" />
+                      }
                     </div>
 
                     <div class="item-info">
@@ -476,6 +480,13 @@ type CheckoutStep = 'bag' | 'tickets' | 'verifying' | 'receipt';
       align-items: center;
       justify-content: center;
       color: var(--ion-color-primary);
+      overflow: hidden;
+    }
+    .item-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .item-info {
