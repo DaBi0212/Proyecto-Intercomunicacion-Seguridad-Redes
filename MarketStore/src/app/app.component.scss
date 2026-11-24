@@ -1,0 +1,40 @@
+.faceid-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: hudIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.faceid-hud {
+  --r: 24px;
+  width: 168px;
+  height: 168px;
+  padding: 18px;
+  background: var(--ios-hud);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  color: var(--ios-label);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.faceid-glyph {
+  color: var(--ion-color-primary);
+}
+.faceid-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+@keyframes hudIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}

@@ -1,0 +1,76 @@
+<!-- Barra de navegación superior translúcida -->
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="wallet.toggleTheme()" aria-label="Cambiar apariencia">
+        <sf-symbol name="circle.lefthalf.filled" [size]="22" />
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Actividad</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="wallet.lockSession('Bloqueo manual')" aria-label="Bloquear">
+        <sf-symbol name="lock.fill" [size]="20" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <!-- Encabezado Large Title nativo de iOS -->
+  <ion-header collapse="condense">
+    <ion-toolbar>
+      <ion-title size="large">Actividad</ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <!-- Resumen limpio de compras vs. canjes -->
+  <section class="summary">
+    <div class="summary-cell continuous">
+      <span class="sum-label">Adquirido</span>
+      <strong class="sum-value is-buy">
+        {{ wallet.totalBought() | currency: 'MXN' : 'symbol-narrow' }}
+      </strong>
+    </div>
+    <div class="summary-cell continuous">
+      <span class="sum-label">Canjeado</span>
+      <strong class="sum-value">
+        {{ wallet.totalRedeemed() | currency: 'MXN' : 'symbol-narrow' }}
+      </strong>
+    </div>
+  </section>
+
+  <ion-list-header>
+    <ion-label>Transacciones recientes</ion-label>
+  </ion-list-header>
+
+  <!-- Lista nativa de iOS con estilo inset grouped -->
+  <ion-list [inset]="true">
+    @for (tx of wallet.transactions(); track tx.id; let last = $last) {
+      <ion-item [lines]="last ? 'none' : 'inset'">
+        <span
+          slot="start"
+          class="tx-glyph continuous"
+          [class.is-buy]="tx.type === 'buy'"
+        >
+          <sf-symbol [name]="symbolFor(tx)" [size]="19" [weight]="2" />
+        </span>
+
+        <ion-label>
+          <h3>{{ tx.title }}</h3>
+          <p>{{ tx.subtitle }} · {{ tx.date }}</p>
+        </ion-label>
+
+        <div slot="end" class="tx-trailing">
+          <span class="tx-amount" [class.is-buy]="tx.type === 'buy'">
+            {{ tx.type === 'buy' ? '+' : '−' }}{{ tx.amount | currency: 'MXN' : 'symbol-narrow' }}
+          </span>
+          <span class="tx-folio">{{ tx.id }}</span>
+        </div>
+      </ion-item>
+    }
+  </ion-list>
+
+  <p class="list-foot">
+    Cada operación está respaldada por un folio auditable emitido por el Banco Central.
+  </p>
+</ion-content>

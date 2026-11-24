@@ -1,0 +1,28 @@
+<!-- HUD biométrico y criptográfico nativo de iOS (idéntico a WalletPay) -->
+@if (market.hudState().expanded) {
+  <div class="faceid-backdrop" role="status" aria-live="polite">
+    <div class="faceid-hud continuous">
+      <sf-symbol
+        class="faceid-glyph"
+        [name]="market.hudState().symbol"
+        [size]="48"
+        [weight]="1.9"
+      />
+      <span class="faceid-label">{{ market.hudState().label }}</span>
+    </div>
+  </div>
+}
+
+<!-- Barra de navegación superior + Tab Bar móvil cuando la sesión está activa -->
+@if (market.isAuthenticated()) {
+  <app-shell-nav />
+}
+
+<main class="app-main">
+  <router-outlet />
+</main>
+
+<!-- Bolsa de compras y Checkout con Verificación Bancaria -->
+@if (market.isAuthenticated()) {
+  <app-cart-drawer />
+}

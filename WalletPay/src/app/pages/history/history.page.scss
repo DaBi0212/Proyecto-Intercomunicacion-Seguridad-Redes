@@ -1,0 +1,93 @@
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 4px 16px 12px;
+}
+.summary-cell {
+  --r: 14px;
+  padding: 14px 16px;
+  background: var(--ios-cell);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sum-label {
+  font-size: 13px;
+  color: var(--ios-label-2);
+}
+.sum-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ios-label);
+}
+.sum-value.is-buy {
+  color: var(--ion-color-success);
+}
+
+ion-list-header {
+  padding-left: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ios-label-2);
+}
+
+.tx-glyph {
+  --r: 10px;
+  width: 38px;
+  height: 38px;
+  margin-right: 12px;
+  background: var(--ios-fill);
+  color: var(--ios-label-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tx-glyph.is-buy {
+  background: rgba(52, 199, 89, 0.16);
+  color: var(--ion-color-success);
+}
+
+ion-label h3 {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.015em;
+  color: var(--ios-label) !important;
+}
+ion-label p {
+  font-size: 13px !important;
+  color: var(--ios-label-2) !important;
+  margin-top: 2px;
+}
+
+.tx-trailing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.tx-amount {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  color: var(--ios-label-2);
+}
+.tx-amount.is-buy {
+  color: var(--ion-color-success);
+}
+.tx-folio {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ios-label-3);
+}
+
+.list-foot {
+  margin: 0;
+  padding: 6px 24px 32px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ios-label-2);
+}

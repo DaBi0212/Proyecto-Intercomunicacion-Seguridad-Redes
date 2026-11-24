@@ -1,0 +1,207 @@
+<div class="page-container">
+  <!-- ENCABEZADO Y SEGMENTED CONTROL ESTILO iOS -->
+  <header class="page-head">
+    <div>
+      <span class="eyebrow">SINCRONIZACIÓN EN TIEMPO REAL CON WALLETPAY</span>
+      <h1>Mis Tickets Electrónicos</h1>
+      <p>Certificados digitales de valor fijo emitidos por el Banco Central para pagar en MarketStore.</p>
+    </div>
+
+    <div class="ios-segmented" role="tablist">
+      <button
+        type="button"
+        class="ios-segment-btn"
+        [class.active]="segment() === 'active'"
+        (click)="setSegment('active')"
+      >
+        Disponibles ({{ market.activeTickets().length }})
+      </button>
+      <button
+        type="button"
+        class="ios-segment-btn"
+        [class.active]="segment() === 'used'"
+        (click)="setSegment('used')"
+      >
+        Canjeados ({{ market.usedTickets().length }})
+      </button>
+    </div>
+  </header>
+
+  <!-- TARJETA RESUMEN DE SALDO Y VINCULACIÓN DE FOLIO EXTERNO -->
+  <section class="balance-strip continuous">
+    <div class="bs-left">
+      <span class="bs-label">Saldo disponible en Tickets Activos</span>
+      <div class="bs-amount-row">
+        <strong class="bs-amount">
+          {{ market.availableTicketBalance() | currency: 'MXN' : 'symbol-narrow' }}<small>MXN</small>
+        </strong>
+        @if (market.storeCredit() > 0) {
+          <span class="credit-badge continuous">
+            + {{ market.storeCredit() | currency: 'MXN' : 'symbol-narrow' }} saldo a favor
+          </span>
+        }
+      </div>
+    </div>
+
+    <div class="bs-right">
+      <div class="folio-import-bar">
+        <input
+          type="text"
+          class="folio-in mono"
+          placeholder="Vincular folio de app WalletPay (ej. TKT-9012-B4F1)"
+          [(ngModel)]="externalFolio"
+        />
+        <select class="folio-sel" [(ngModel)]="externalDenom">
+          <option [ngValue]="50">$50</option>
+          <option [ngValue]="100">$100</option>
+          <option [ngValue]="200">$200</option>
+          <option [ngValue]="500">$500</option>
+        </select>
+        <button type="button" class="folio-submit continuous apple-pressable" (click)="linkExternalTicket()">
+          <sf-symbol name="qrcode" [size]="16" />
+          <span>Vincular</span>
+        </button>
+      </div>
+      @if (importFeedback()) {
+        <span class="import-feedback">{{ importFeedback() }}</span>
+      }
+    </div>
+  </section>
+
+  <!-- VISTA 1 y 2: PASES ACTIVOS O USADOS (DISEÑO 1:1 CON WALLETPAY VAULTPAGE) -->
+  @if (segment() !== 'buy') {
+    @if (displayedTickets().length === 0) {
+      <div class="empty-state continuous">
+        <div class="empty-icon continuous">
+          <sf-symbol name="wallet.pass" [size]="34" />
+        </div>
+        <h3>{{ segment() === 'active' ? 'Sin tickets disponibles' : 'Sin tickets canjeados' }}</h3>
+        <p>
+          {{
+            segment() === 'active'
+              ? 'La compra de tickets se realiza exclusivamente desde la aplicación móvil WalletPay. Tus tickets adquiridos en WalletPay se sincronizan aquí automáticamente.'
+              : 'Los tickets que utilices como medio de pago aparecerán aquí con su sello de verificación.'
+          }}
+        </p>
+      </div>
+    } @else {
+      <div class="passes-grid">
+        @for (t of displayedTickets(); track t.id) {
+          <article
+            class="pass continuous"
+            [class]="'pass continuous ' + t.colorClass"
+            [class.is-used]="t.status === 'used'"
+          >
+            <!-- Marca de agua geométrica de seguridad (Guilloché idéntica a WalletPay) -->
+            <svg class="pass-watermark" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+              <circle cx="150" cy="85" r="88" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 5" />
+              <circle cx="150" cy="85" r="64" stroke="currentColor" stroke-width="1.2" />
+              <circle cx="150" cy="85" r="40" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 4" />
+              <path d="M90 85h120M150 25v120" stroke="currentColor" stroke-width="0.8" />
+            </svg>
+
+            <!-- Muescas laterales de boleto -->
+            <span class="notch notch-left" aria-hidden="true"></span>
+            <span class="notch notch-right" aria-hidden="true"></span>
+
+            <!-- Cabecera del pase -->
+            <header class="pass-head">
+              <div class="issuer">
+                <span class="issuer-badge">
+                  <sf-symbol name="building.columns" [size]="14" [weight]="2.1" />
+                </span>
+                <div class="issuer-text">
+                  <strong>BANCO CENTRAL</strong>
+                  <span>CERTIFICADO DIGITAL · {{ t.tier | uppercase }}</span>
+                </div>
+              </div>
+              <span
+                class="status-pill"
+                [class.used]="t.status === 'used'"
+                [class.gold-pill]="t.amount === 500 && t.status === 'active'"
+              >
+                {{ t.status === 'used' ? 'CANJEADO' : 'ACTIVO' }}
+              </span>
+            </header>
+
+            <!-- Valor nominal + Chip EMV -->
+            <div class="pass-middle">
+              <div class="pass-price-block">
+                <span class="pass-label">VALOR NOMINAL FIJO</span>
+                <div class="pass-amount">
+                  <span class="cur">$</span>{{ t.amount }}<span class="dec">.00</span>
+                  <small>MXN</small>
+                </div>
+              </div>
+
+              <div class="emv-chip" [class.gold-chip]="t.amount === 500" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+
+            <!-- Metadatos enmascarados -->
+            <div class="pass-meta">
+              <div>
+                <span class="meta-k">FOLIO DE SEGURIDAD</span>
+                <span class="meta-v mono">{{ t.qrRevealed ? t.id : t.serialMasked }}</span>
+              </div>
+              <div>
+                <span class="meta-k">{{ t.status === 'used' ? 'ORDEN / USO' : 'EMITIDO' }}</span>
+                <span class="meta-v">{{ t.status === 'used' ? (t.orderId || t.usedAt) : t.issuedAt }}</span>
+              </div>
+            </div>
+
+            <!-- Línea divisoria perforada -->
+            <div class="pass-perforation" aria-hidden="true"></div>
+
+            <!-- Talón inferior del ticket con QR difuminado por seguridad -->
+            <button
+              type="button"
+              class="qr-well continuous apple-pressable"
+              (click)="market.toggleTicketQrReveal(t.id)"
+            >
+              <div class="qr-frame">
+                @let qrSvg = getQrSvgForTicket(t);
+                <svg
+                  class="qr-code"
+                  [class.blurred]="!t.qrRevealed"
+                  [attr.viewBox]="qrSvg.viewBox"
+                  width="60"
+                  height="60"
+                  shape-rendering="crispEdges"
+                  aria-hidden="true"
+                >
+                  <rect width="100%" height="100%" fill="#fff" />
+                  <path [attr.d]="qrSvg.path" fill="#000" />
+                </svg>
+                @if (!t.qrRevealed) {
+                  <span class="qr-lock">
+                    <sf-symbol name="lock.fill" [size]="17" />
+                  </span>
+                }
+              </div>
+
+              <div class="qr-copy">
+                <div class="qr-title-row">
+                  <strong class="mono">{{ t.qrRevealed ? t.id : t.serialMasked }}</strong>
+                  <span class="rsa-tag">OFICIAL</span>
+                </div>
+                <span>
+                  {{
+                    t.status === 'used'
+                      ? t.qrRevealed
+                        ? 'Folio TKT y QR visibles · Ticket ya canjeado (Anti-doble gasto)'
+                        : 'Ticket ya canjeado · Toca para revelar Folio TKT y Código QR'
+                      : t.qrRevealed
+                      ? 'Folio visible · Toca para ocultar'
+                      : 'Código protegido · Toca para ver con Face ID'
+                  }}
+                </span>
+              </div>
+            </button>
+          </article>
+        }
+      </div>
+    }
+  }
+</div>

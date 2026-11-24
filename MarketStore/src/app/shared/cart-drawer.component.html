@@ -1,0 +1,320 @@
+@if (market.cartOpen()) {
+  <div class="scrim" (click)="close()" role="presentation"></div>
+
+  <aside class="drawer continuous" role="dialog" aria-modal="true" aria-label="Bolsa de compras y pago con tickets">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+
+    <!-- Cabecera del Sheet -->
+    <header class="drawer-head">
+      @if (step() === 'tickets') {
+        <button class="nav-back apple-pressable" (click)="step.set('bag')">
+          <sf-symbol name="chevron.left" [size]="16" [weight]="2.4" />
+          <span>Bolsa</span>
+        </button>
+      } @else {
+        <span></span>
+      }
+
+      <span class="drawer-title">
+        @switch (step()) {
+          @case ('bag') { Bolsa de Compras }
+          @case ('tickets') { Pagar con Tickets }
+          @case ('verifying') { Verificando Tickets }
+          @case ('receipt') { Compra Verificada }
+        }
+      </span>
+
+      <button class="sheet-close apple-pressable" aria-label="Cerrar" (click)="close()">
+        <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+      </button>
+    </header>
+
+    <div class="drawer-body">
+      <!-- PASO 1: ARTÍCULOS EN LA BOLSA -->
+      @if (step() === 'bag') {
+        @if (market.cart().length === 0) {
+          <div class="empty-bag">
+            <div class="empty-icon continuous">
+              <sf-symbol name="bag" [size]="32" />
+            </div>
+            <h3>Tu bolsa está vacía</h3>
+            <p>Explora el catálogo y agrega productos para pagarlos con tus tickets electrónicos del Banco Central.</p>
+          </div>
+        } @else {
+          <div class="bag-banner continuous">
+            <sf-symbol name="shield.checkered" [size]="18" />
+            <div>
+              <strong>Pago exclusivo con Tickets Bancarios</strong>
+              <span>Tus tickets de $50, $100, $200 y $500 se validan en tiempo real ante el Banco Central.</span>
+            </div>
+          </div>
+
+          <div class="cart-list continuous">
+            @for (item of market.cart(); track item.product.id) {
+              <div class="cart-item">
+                <div class="item-thumb continuous" [class]="'item-thumb continuous ' + item.product.surfaceClass">
+                  @if (item.product.imageUrl) {
+                    <img [src]="item.product.imageUrl" [alt]="item.product.title" class="item-thumb-img" />
+                  } @else {
+                    <sf-symbol [name]="item.product.symbolName" [size]="24" />
+                  }
+                </div>
+
+                <div class="item-info">
+                  <h4>{{ item.product.title }}</h4>
+                  <span class="item-sku mono">{{ item.product.sku }} · {{ item.product.sellerName }}</span>
+                  <div class="item-price-row">
+                    <strong class="item-price">
+                      {{ item.product.price * item.quantity | currency: 'MXN' : 'symbol-narrow' }}
+                    </strong>
+                    <div class="qty-stepper">
+                      <button type="button" class="step-btn apple-pressable" (click)="market.updateCartQuantity(item.product.id, -1)" aria-label="Disminuir cantidad">
+                        <sf-symbol name="minus" [size]="12" [weight]="2.6" />
+                      </button>
+                      <span class="qty-num">{{ item.quantity }}</span>
+                      <button type="button" class="step-btn apple-pressable" (click)="market.updateCartQuantity(item.product.id, 1)" aria-label="Aumentar cantidad">
+                        <sf-symbol name="plus" [size]="12" [weight]="2.6" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Resumen financiero -->
+          <div class="summary-card continuous">
+            <div class="sum-row">
+              <span>Subtotal ({{ market.cartCount() }} artículos)</span>
+              <span>{{ market.cartSubtotal() | currency: 'MXN' : 'symbol-narrow' }}</span>
+            </div>
+            <div class="sum-row">
+              <span>Envío Express Asegurado</span>
+              <span class="free-tag">Gratis</span>
+            </div>
+            <div class="sum-row">
+              <span>Verificación con Banco Central</span>
+              <span>Incluida</span>
+            </div>
+            <div class="sum-divider"></div>
+            <div class="sum-row total-row">
+              <strong>Total a cubrir con Tickets</strong>
+              <strong>{{ market.cartSubtotal() | currency: 'MXN' : 'symbol-narrow' }} <small>MXN</small></strong>
+            </div>
+          </div>
+
+          <button class="primary-cta continuous apple-pressable" (click)="goToTicketSelection()">
+            <sf-symbol name="wallet.pass" [size]="20" [weight]="2" />
+            <span>Seleccionar Tickets de Pago</span>
+          </button>
+        }
+      }
+
+      <!-- PASO 2: SELECCIÓN Y VERIFICACIÓN DE TICKETS ELECTRÓNICOS -->
+      @if (step() === 'tickets') {
+        <div class="coverage-card continuous" [class.is-covered]="isCovered()">
+          <div class="cov-top">
+            <div>
+              <span class="cov-label">TOTAL DEL PEDIDO</span>
+              <strong class="cov-total">{{ market.cartSubtotal() | currency: 'MXN' : 'symbol-narrow' }}</strong>
+            </div>
+            <div class="cov-right">
+              <span class="cov-label">CUBIERTO CON TICKETS</span>
+              <strong class="cov-paid" [class.ok]="isCovered()">
+                {{ totalSelectedAndCredit() | currency: 'MXN' : 'symbol-narrow' }}
+              </strong>
+            </div>
+          </div>
+
+          <div class="cov-bar">
+            <div class="cov-fill" [style.width.%]="coveragePercent()"></div>
+          </div>
+
+          <div class="cov-foot">
+            @if (isCovered()) {
+              <span class="cov-status ok">
+                <sf-symbol name="checkmark.circle.fill" [size]="15" />
+                Monto cubierto ({{ selectedTicketIds().length }} ticket{{ selectedTicketIds().length === 1 ? '' : 's' }})
+                @if (projectedChange() > 0) {
+                  · Cambio a favor: +{{ projectedChange() | currency: 'MXN' : 'symbol-narrow' }}
+                }
+              </span>
+            } @else {
+              <span class="cov-status pending">
+                Faltan {{ missingAmount() | currency: 'MXN' : 'symbol-narrow' }} MXN por cubrir con tickets
+              </span>
+            }
+            <button type="button" class="auto-pick-btn apple-pressable" (click)="autoSelectOptimal()">
+              Auto-seleccionar
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de Tickets Activos en Bóveda WalletPay -->
+        <div class="sec-head-inline">
+          <span>Mis Tickets en WalletPay ({{ market.activeTickets().length }} disponibles)</span>
+          <button type="button" class="link-btn" (click)="showManualInput.set(!showManualInput())">
+            {{ showManualInput() ? 'Ocultar folio manual' : '+ Validar folio TKT de WalletPay' }}
+          </button>
+        </div>
+
+        <!-- Panel desplegable para importar folio externo desde WalletPay -->
+        @if (showManualInput() || market.activeTickets().length === 0) {
+          <div class="quick-bank-box continuous">
+            <p class="qb-desc">
+              La compra de tickets se realiza exclusivamente en la app móvil <strong>WalletPay</strong>. Si tienes un folio de ticket emitido en WalletPay, ingrésalo aquí para verificarlo:
+            </p>
+            <div class="folio-form">
+              <input
+                type="text"
+                class="ios-input mono"
+                placeholder="Ej. TKT-8420-A1B2"
+                [(ngModel)]="manualFolio"
+              />
+              <select class="ios-select" [(ngModel)]="manualAmount">
+                <option [ngValue]="50">$50 MXN</option>
+                <option [ngValue]="100">$100 MXN</option>
+                <option [ngValue]="200">$200 MXN</option>
+                <option [ngValue]="500">$500 MXN</option>
+              </select>
+              <button type="button" class="folio-btn apple-pressable" (click)="importManualFolio()">
+                Verificar
+              </button>
+            </div>
+            @if (folioFeedback()) {
+              <span class="folio-msg">{{ folioFeedback() }}</span>
+            }
+          </div>
+        }
+
+        <div class="tickets-selector-list">
+          @for (t of market.activeTickets(); track t.id) {
+            <button
+              type="button"
+              class="mini-pass continuous apple-pressable"
+              [class]="'mini-pass continuous apple-pressable ' + t.colorClass"
+              [class.selected]="isTicketSelected(t.id)"
+              (click)="toggleTicket(t.id)"
+            >
+              <div class="mp-left">
+                <div class="mp-issuer">
+                  <sf-symbol name="building.columns" [size]="12" [weight]="2.2" />
+                  <span>BANCO CENTRAL · {{ t.tier }}</span>
+                </div>
+                <div class="mp-amount">
+                  <span class="cur">$</span>{{ t.amount }}<small>.00 MXN</small>
+                </div>
+                <span class="mp-serial mono">{{ t.id }} · Oficial</span>
+              </div>
+
+              <div class="mp-right">
+                <div class="emv-mini" [class.gold]="t.amount === 500"></div>
+                <span class="check-circle" [class.checked]="isTicketSelected(t.id)">
+                  @if (isTicketSelected(t.id)) {
+                    <sf-symbol name="checkmark" [size]="13" [weight]="2.8" />
+                  }
+                </span>
+              </div>
+            </button>
+          }
+        </div>
+
+        @if (checkoutError()) {
+          <p class="error-msg" role="alert">{{ checkoutError() }}</p>
+        }
+
+        <div class="pay-footer">
+          <button
+            type="button"
+            class="pay-btn continuous apple-pressable"
+            [disabled]="!isCovered()"
+            (click)="confirmAndVerifyPurchase()"
+          >
+            <sf-symbol name="faceid" [size]="22" [weight]="2" />
+            <span>Verificar con Banco y Pagar {{ market.cartSubtotal() | currency: 'MXN' : 'symbol-narrow' }}</span>
+          </button>
+          <p class="pay-caption">
+            La tienda verificará la validez y autenticidad de tus tickets con el Banco Central antes de aceptar el cargo.
+          </p>
+        </div>
+      }
+
+      <!-- PASO 3: VERIFICACIÓN EN CURSO CON EL BANCO CENTRAL -->
+      @if (step() === 'verifying') {
+        <div class="verifying-stage">
+          <div class="verify-orb continuous">
+            <sf-symbol name="shield.checkered" [size]="42" />
+          </div>
+          <h3>Verificando validez con el Banco Central</h3>
+          <p class="verify-status">{{ verificationStageText() }}</p>
+
+          <div class="verify-steps continuous">
+            <div class="v-step done">
+              <sf-symbol name="checkmark.circle.fill" [size]="18" />
+              <span>Lectura de folios y certificados de valor fijo</span>
+            </div>
+            <div class="v-step done">
+              <sf-symbol name="checkmark.circle.fill" [size]="18" />
+              <span>Comprobación de autenticidad e integridad del ticket</span>
+            </div>
+            <div class="v-step active">
+              <sf-symbol name="building.columns" [size]="18" />
+              <span>Autorización anti-doble-gasto del Banco Central</span>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- PASO 4: RECIBO DIGITAL VERIFICADO -->
+      @if (step() === 'receipt' && completedOrder(); as ord) {
+        <div class="receipt-stage">
+          <div class="receipt-badge">
+            <sf-symbol name="checkmark.seal.fill" [size]="54" />
+          </div>
+          <h3>Compra Aprobada</h3>
+          <p class="receipt-sub">El Banco Central verificó y liquidó tus tickets electrónicos.</p>
+
+          <div class="receipt-card continuous">
+            <div class="rc-row">
+              <span>Folio de Orden</span>
+              <strong class="mono">#{{ ord.id }}</strong>
+            </div>
+            <div class="rc-row">
+              <span>Sello Bancario</span>
+              <strong class="mono ok-text">{{ ord.bankVerificationCode }}</strong>
+            </div>
+            <div class="rc-row">
+              <span>Tickets Canjeados</span>
+              <strong>{{ ord.ticketsUsed.length }} ({{ ord.totalPaidWithTickets | currency: 'MXN' : 'symbol-narrow' }})</strong>
+            </div>
+            <div class="rc-tickets-pills">
+              @for (tk of ord.ticketsUsed; track tk.id) {
+                <span class="rc-tk-pill mono">{{ tk.id }} ({{ '$' + tk.amount }})</span>
+              }
+            </div>
+            @if (ord.changeCredited > 0) {
+              <div class="rc-row">
+                <span>Saldo a favor acreditado</span>
+                <strong class="ok-text">+{{ ord.changeCredited | currency: 'MXN' : 'symbol-narrow' }}</strong>
+              </div>
+            }
+            <div class="sum-divider"></div>
+            <div class="rc-row total">
+              <span>Total Pagado</span>
+              <strong>{{ ord.subtotal | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
+            </div>
+          </div>
+
+          <div class="receipt-actions">
+            <button type="button" class="primary-cta continuous apple-pressable" (click)="viewOrders()">
+              Ver en Mis Pedidos
+            </button>
+            <button type="button" class="secondary-cta continuous apple-pressable" (click)="close()">
+              Seguir explorando la tienda
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </aside>
+}

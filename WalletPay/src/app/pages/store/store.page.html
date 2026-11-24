@@ -1,0 +1,479 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="wallet.toggleTheme()" aria-label="Cambiar apariencia">
+        <sf-symbol name="circle.lefthalf.filled" [size]="22" />
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Comprar Tickets</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="goToVault()" aria-label="Mis Tickets y Escáner QR">
+        <sf-symbol name="qrcode.viewfinder" [size]="21" />
+      </ion-button>
+      <ion-button (click)="wallet.lockSession('Bloqueo manual')" aria-label="Bloquear">
+        <sf-symbol name="lock.fill" [size]="20" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-header collapse="condense">
+    <ion-toolbar>
+      <ion-title size="large">Comprar Tickets</ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <!-- Tarjeta de Persona Activa (Soporte Multi-Usuario) -->
+  <section class="user-strip continuous">
+    <div class="us-left">
+      <span class="us-avatar">{{ wallet.currentUserInitials() }}</span>
+      <div class="us-copy">
+        <strong>{{ wallet.currentUserName() || 'Usuario Activo' }}</strong>
+        <span>{{ wallet.currentUserEmail() }}</span>
+      </div>
+    </div>
+    <button class="us-switch continuous apple-pressable" (click)="wallet.lockSession('Cambio de cuenta')">
+      <sf-symbol name="person.crop.circle" [size]="15" />
+      <span>Cambiar</span>
+    </button>
+  </section>
+
+  <!-- Aviso en vivo si hay solicitudes de compra de ticket pendientes de aprobación del Banco -->
+  @if (wallet.pendingTicketRequests().length > 0) {
+    <section class="pending-req-banner continuous">
+      <sf-symbol name="clock.fill" [size]="19" />
+      <div class="prb-copy">
+        <strong>{{ wallet.pendingTicketRequests().length }} compra(s) esperando aprobación del Banco</strong>
+        <span>El Administrador de CentralBank debe aceptar el pago de tu tarjeta para emitir el ticket.</span>
+      </div>
+    </section>
+  }
+
+  <!-- Tarjeta resumen de saldo disponible en bóveda -->
+  <section class="balance-card continuous">
+    <div class="bal-main">
+      <span class="balance-label">Saldo disponible en tu wallet</span>
+      <span class="balance-amount">
+        {{ wallet.availableBalance() | currency: 'MXN' : 'symbol-narrow' }}<small>MXN</small>
+      </span>
+    </div>
+    <button class="balance-pill continuous apple-pressable" (click)="goToVault()">
+      <span>{{ wallet.activeTickets().length }} activos</span>
+      <sf-symbol name="chevron.right" [size]="13" [weight]="2.4" />
+    </button>
+  </section>
+
+  <header class="section-head">
+    <div>
+      <h2>Denominaciones oficiales</h2>
+      <p>Los cargos de los tickets seran emitidos tras aprobación de CentralBank de tu tarjeta</p>
+    </div>
+  </header>
+
+  <!-- Tarjetas estilo Apple Card / App Store Gift Card -->
+  <div class="cards-stack">
+    @for (d of denominations; track d.amount) {
+      <article
+        class="ticket-card continuous apple-pressable"
+        [class]="'ticket-card continuous apple-pressable ' + d.cls"
+        [attr.aria-label]="'Comprar ticket de ' + d.amount + ' pesos'"
+        (click)="open(d)"
+      >
+        <svg class="card-watermark" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+          <circle cx="150" cy="100" r="88" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 5" />
+          <circle cx="150" cy="100" r="64" stroke="currentColor" stroke-width="1.2" />
+          <circle cx="150" cy="100" r="40" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 4" />
+          <path d="M90 100h120M150 40v120" stroke="currentColor" stroke-width="0.8" />
+        </svg>
+
+        <span class="notch notch-left" aria-hidden="true"></span>
+        <span class="notch notch-right" aria-hidden="true"></span>
+
+        <div class="tc-top">
+          <div class="tc-issuer">
+            <span class="tc-emblem">
+              <sf-symbol name="building.columns" [size]="14" [weight]="2.1" />
+            </span>
+            <div class="tc-issuer-copy">
+              <strong>BANCO CENTRAL</strong>
+              <span>CERTIFICADO DIGITAL · {{ d.tier | uppercase }}</span>
+            </div>
+          </div>
+
+          <span class="tc-badge" [class.gold-badge]="d.isTitanium">
+            {{ d.badge }}
+          </span>
+        </div>
+
+        <div class="tc-middle">
+          <div class="tc-price-block">
+            <div class="tc-amount">
+              <span class="cur">$</span>{{ d.amount }}<span class="dec">.00</span>
+            </div>
+            <span class="tc-currency-tag">MXN · Valor Fijo</span>
+          </div>
+
+          <div class="tc-hardware" aria-hidden="true">
+            <div class="emv-chip" [class.gold-chip]="d.isTitanium">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tc-perforation" aria-hidden="true"></div>
+
+        <div class="tc-bottom">
+          <div class="tc-meta">
+            <span class="tc-desc">{{ d.desc }}</span>
+            <span class="tc-serial">{{ d.code }}</span>
+          </div>
+
+          <div class="tc-cta" [class.gold-cta]="d.isTitanium">
+            <span>Adquirir</span>
+            <sf-symbol name="plus" [size]="14" [weight]="2.6" />
+          </div>
+        </div>
+      </article>
+    }
+  </div>
+
+  <p class="footnote">
+    <sf-symbol name="shield.checkered" [size]="16" />
+    <span>
+      Cada compra de ticket es validada y aprobada por CentralBank.
+    </span>
+  </p>
+
+  <!-- Bottom Sheet deslizable de confirmación y aprobación bancaria -->
+  <ion-modal
+    class="sheet-auto"
+    [isOpen]="sheetOpen()"
+    [initialBreakpoint]="1"
+    [breakpoints]="[0, 1]"
+    [handle]="true"
+    (didDismiss)="onDismiss()"
+  >
+    <ng-template>
+      <div class="sheet">
+        @if (selected(); as d) {
+          <div class="sheet-head">
+            <span class="sheet-title">
+              @switch (state()) {
+                @case ('done') { ¡Pago Aprobado! }
+                @case ('waiting_approval') { Validando Tarjeta en Banco }
+                @case ('rejected') { Pago Rechazado }
+                @case ('adding_card') { Agregar Tarjeta de Débito / Crédito }
+                @default { Confirmar compra de ticket }
+              }
+            </span>
+            <button class="sheet-close" aria-label="Cerrar" (click)="close()">
+              <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+            </button>
+          </div>
+
+          <!-- Mini tarjeta en el modal -->
+          @if (state() !== 'adding_card') {
+            <div class="sheet-card continuous" [class]="'sheet-card continuous ' + d.cls">
+              <div class="sc-top">
+                <span class="sc-issuer">
+                  <sf-symbol name="building.columns" [size]="13" [weight]="2" />
+                  Banco Central
+                </span>
+                <span class="emv-mini"></span>
+              </div>
+              <span class="sheet-card-amount">
+                @if (ticketQuantity() > 1) {
+                  <small style="font-size: 16px; opacity: 0.9; margin-right: 4px;">{{ ticketQuantity() }}×</small>
+                }
+                <span class="cur">$</span>{{ d.amount }}<small>.00</small>
+              </span>
+              <div class="sc-bottom">
+                <span>Ticket {{ d.tier }} · MXN</span>
+                <span class="sc-code">
+                  @if (ticketQuantity() > 1) {
+                    TOTAL {{ d.amount * ticketQuantity() | currency: 'MXN' : 'symbol-narrow' }}
+                  } @else {
+                    {{ d.code }}
+                  }
+                </span>
+              </div>
+            </div>
+          }
+
+          @if (state() === 'done') {
+            <div class="done">
+              <sf-symbol class="done-icon" name="checkmark.circle.fill" [size]="56" />
+              <strong>Pago Aprobado por el Banco Central</strong>
+              <span>
+                @if (ticketQuantity() > 1) {
+                  El Administrador autorizó tu tarjeta y los {{ ticketQuantity() }} tickets de {{ d.amount | currency: 'MXN' : 'symbol-narrow' }} se guardaron en Mis Tickets.
+                } @else {
+                  El Administrador autorizó tu tarjeta y el ticket se guardó en Mis Tickets.
+                }
+              </span>
+            </div>
+          } @else if (state() === 'waiting_approval') {
+            <div class="waiting-box continuous">
+              <div class="wait-orb">
+                <ion-spinner name="crescent" />
+              </div>
+              <strong>Esperando Aprobación del Administrador</strong>
+              <p>{{ approvalProgressText() }}</p>
+              <div class="wait-steps">
+                <div class="ws-row ok">
+                  <sf-symbol name="checkmark.circle.fill" [size]="16" />
+                  <span>Solicitud {{ currentRequestId() ? '#' + currentRequestId() : '' }} enviada por canal seguro</span>
+                </div>
+                <div class="ws-row active">
+                  <sf-symbol name="building.columns" [size]="16" />
+                  <span>El Administrador en CentralBank acepta o rechaza el cargo a tarjeta</span>
+                </div>
+              </div>
+            </div>
+          } @else if (state() === 'rejected') {
+            <div class="rejected-box continuous">
+              <sf-symbol class="rej-icon" name="exclamationmark.triangle.fill" [size]="48" />
+              <strong>Pago Rechazado por el Banco Central</strong>
+              <p>{{ rejectionReason() }}</p>
+              <button class="pay-btn continuous apple-pressable" (click)="state.set('idle')">
+                Intentar con otro método de pago
+              </button>
+            </div>
+          } @else if (state() === 'adding_card') {
+            <div class="add-card-box">
+              <!-- Previsualización interactiva de la tarjeta ingresada -->
+              <div class="custom-card-preview continuous" [style.background]="previewCardBrand().gradient">
+                <div class="ccp-top">
+                  <span class="ccp-bank">
+                    <sf-symbol name="creditcard.fill" [size]="14" />
+                    <span>{{ previewCardBrand().name }}</span>
+                  </span>
+                  <span class="emv-mini"></span>
+                </div>
+                <div class="ccp-number mono">
+                  {{ newCardNumber.trim() || '•••• •••• •••• ••••' }}
+                </div>
+                <div class="ccp-bottom">
+                  <div>
+                    <small>VENCIMIENTO</small>
+                    <strong class="mono">{{ newCardExpiry.trim() || 'MM/AA' }}</strong>
+                  </div>
+                  <div>
+                    <small>CVC / CVV</small>
+                    <strong class="mono">{{ newCardCvc.trim() || '•••' }}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-form continuous">
+                <label class="cf-field">
+                  <span>NÚMERO DE TARJETA O CUENTA (16 DÍGITOS)</span>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="19"
+                    class="mono"
+                    placeholder="4532 •••• •••• 1234"
+                    [(ngModel)]="newCardNumber"
+                    (input)="formatCardNumberInput()"
+                  />
+                </label>
+                <div class="cf-row">
+                  <label class="cf-field">
+                    <span>VENCIMIENTO (MM/AA)</span>
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="5"
+                      class="mono"
+                      placeholder="08/29"
+                      [(ngModel)]="newCardExpiry"
+                      (input)="formatCardExpiryInput()"
+                    />
+                  </label>
+                  <label class="cf-field">
+                    <span>CVC / CVV</span>
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="4"
+                      class="mono"
+                      placeholder="123"
+                      [(ngModel)]="newCardCvc"
+                      (input)="formatCardCvcInput()"
+                    />
+                  </label>
+                </div>
+                <label class="cf-field">
+                  <span>ALIAS O BANCO (OPCIONAL)</span>
+                  <input
+                    type="text"
+                    maxlength="30"
+                    placeholder="Ej. Mi Tarjeta Débito BBVA / Nu"
+                    [(ngModel)]="newCardAlias"
+                  />
+                </label>
+              </div>
+
+              @if (cardFormError()) {
+                <p class="cf-error">{{ cardFormError() }}</p>
+              }
+
+              <p class="cf-hint">
+                Puedes ingresar datos simulados de prueba. El Administrador en <strong>CentralBank Desktop</strong> verificará tu tarjeta y aprobará o rechazará la compra.
+              </p>
+
+              <div class="cf-actions">
+                @if (wallet.savedUserCards().length > 0) {
+                  <button type="button" class="cf-cancel continuous apple-pressable" (click)="cancelAddCard()">
+                    Volver
+                  </button>
+                } @else {
+                  <button type="button" class="cf-cancel continuous apple-pressable" (click)="useSpeiWithoutCard()">
+                    Usar SPEI
+                  </button>
+                }
+                <button type="button" class="cf-save continuous apple-pressable" (click)="saveCustomCard()">
+                  <sf-symbol name="checkmark.circle.fill" [size]="18" />
+                  <span>Guardar Tarjeta en mi Cuenta</span>
+                </button>
+              </div>
+            </div>
+          } @else {
+            <ion-list [inset]="true">
+              @if (wallet.savedUserCards().length === 0) {
+                <ion-item button [detail]="false" (click)="openAddCardForm()">
+                  <span slot="start" class="method-icon" style="background: #204DC5">
+                    <sf-symbol name="creditcard" [size]="17" [weight]="2" />
+                  </span>
+                  <ion-label>
+                    <h3>Tarjeta de Débito o Crédito</h3>
+                    <p style="color: var(--ion-color-primary); font-weight: 600 !important;">
+                      Sin tarjeta vinculada · Toca para vincular tu número de cuenta
+                    </p>
+                  </ion-label>
+                  <sf-symbol slot="end" class="check" name="plus.circle.fill" [size]="20" />
+                </ion-item>
+              }
+
+              @for (m of allPaymentMethods(); track m.id) {
+                <ion-item button [detail]="false" (click)="selectMethod(m.id)">
+                  <span slot="start" class="method-icon" [style.background]="m.tint">
+                    <sf-symbol [name]="m.icon" [size]="17" [weight]="2" />
+                  </span>
+                  <ion-label>
+                    <h3>{{ m.title }}</h3>
+                    <p>{{ m.sub }}</p>
+                  </ion-label>
+                  @if (payment() === m.id) {
+                    <sf-symbol slot="end" class="check" name="checkmark" [size]="18" [weight]="2.6" />
+                  }
+                  @if (m.isCustom) {
+                    <button
+                      slot="end"
+                      type="button"
+                      class="del-card-btn"
+                      title="Eliminar tarjeta de la cuenta"
+                      (click)="$event.stopPropagation(); removeCustomCard(m.id)"
+                    >
+                      <sf-symbol name="xmark" [size]="12" [weight]="2.4" />
+                    </button>
+                  }
+                </ion-item>
+              }
+
+              <ion-item button [detail]="false" (click)="openAddCardForm()">
+                <span slot="start" class="method-icon" style="background: #34C759">
+                  <sf-symbol name="plus" [size]="17" [weight]="2.6" />
+                </span>
+                <ion-label>
+                  <h3 style="color: var(--ion-color-primary); font-weight: 600 !important;">
+                    {{
+                      wallet.savedUserCards().length === 0
+                        ? '+ Vincular Tarjeta de Débito / Crédito a mi Cuenta'
+                        : '+ Vincular otra Tarjeta de Débito / Crédito'
+                    }}
+                  </h3>
+                  <p>El número de cuenta quedará guardado permanentemente en tu perfil</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <div class="qty-selector-card continuous">
+              <div class="qty-top">
+                <div class="qty-info">
+                  <strong>Cantidad de tickets</strong>
+                  <span>Denominación de {{ d.amount | currency: 'MXN' : 'symbol-narrow' }} c/u</span>
+                </div>
+                <div class="qty-stepper">
+                  <button
+                    type="button"
+                    class="qty-step-btn apple-pressable"
+                    [disabled]="ticketQuantity() <= 1"
+                    (click)="adjustQuantity(-1)"
+                    aria-label="Disminuir cantidad"
+                  >
+                    <sf-symbol name="minus" [size]="14" [weight]="2.8" />
+                  </button>
+                  <span class="qty-value mono">{{ ticketQuantity() }}</span>
+                  <button
+                    type="button"
+                    class="qty-step-btn apple-pressable"
+                    [disabled]="ticketQuantity() >= 50"
+                    (click)="adjustQuantity(1)"
+                    aria-label="Aumentar cantidad"
+                  >
+                    <sf-symbol name="plus" [size]="14" [weight]="2.8" />
+                  </button>
+                </div>
+              </div>
+              <div class="qty-quick-pills">
+                @for (q of quickQuantities; track q) {
+                  <button
+                    type="button"
+                    class="qty-pill apple-pressable"
+                    [class.active]="ticketQuantity() === q"
+                    (click)="setQuantity(q)"
+                  >
+                    {{ q }} {{ q === 1 ? 'ticket' : 'tickets' }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <ion-list [inset]="true">
+              <ion-item>
+                <ion-label>
+                  {{ ticketQuantity() }}× Ticket {{ d.tier }} ({{ d.amount | currency: 'MXN' : 'symbol-narrow' }})
+                </ion-label>
+                <ion-note slot="end">{{ d.amount * ticketQuantity() | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
+              </ion-item>
+              <ion-item>
+                <ion-label>Validación Bancaria</ion-label>
+                <ion-note slot="end">Administrador CentralBank</ion-note>
+              </ion-item>
+              <ion-item lines="none">
+                <ion-label><strong>Total a autorizar</strong></ion-label>
+                <ion-note slot="end" class="total">{{ d.amount * ticketQuantity() | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
+              </ion-item>
+            </ion-list>
+
+            <div class="pay-wrap">
+              <button
+                class="pay-btn continuous apple-pressable"
+                (click)="confirm()"
+              >
+                <sf-symbol name="faceid" [size]="22" [weight]="2" />
+                <span>{{ payLabel() }}</span>
+              </button>
+              <p class="sheet-foot">
+                CentralBank validará y aprobará el pago de tu tarjeta antes de emitir el ticket.
+              </p>
+            </div>
+          }
+        }
+      </div>
+    </ng-template>
+  </ion-modal>
+</ion-content>

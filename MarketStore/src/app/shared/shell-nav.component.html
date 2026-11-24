@@ -1,0 +1,409 @@
+<!-- ============================================================================
+     ARQUITECTURA DE NAVEGACIÓN ESTILO NEW ERA MÉXICO (NEWERA.MX) CON ESTÉTICA iOS
+     1. Barra Superior de Anuncios (Top Promo Marquee)
+     2. Header Principal en 3 Zonas (Logo Oficial Market Store + Menú Editorial + Buscador/Bolsa/Tickets)
+     3. Mega-Menú Desplegable de Colecciones y Guía de Siluetas de Tickets ($50-$500)
+     ============================================================================ -->
+
+<!-- 1. TOP PROMO & ANNOUNCEMENT BAR (ESTILO NEWERA.MX) -->
+<div class="ne-promo-bar">
+  <div class="ne-promo-inner">
+    <div class="ne-promo-left">
+      <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="ne-promo-mark" />
+      <span class="ne-promo-pill">OFICIAL</span>
+    </div>
+    <div class="ne-promo-right">
+      <span class="ne-sep">|</span>
+      <button type="button" class="ne-top-link" (click)="goToWallet()">
+        PODER DE COMPRA: <strong>{{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
+      </button>
+      <span class="ne-sep">|</span>
+      <div class="ne-role-toggle">
+        <button
+          type="button"
+          [class.active]="market.currentUser()?.role === 'buyer'"
+          (click)="switchRole('buyer')"
+        >
+          COMPRADOR
+        </button>
+        <button
+          type="button"
+          [class.active]="market.currentUser()?.role === 'seller'"
+          (click)="switchRole('seller')"
+        >
+          VENDEDOR
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. HEADER PRINCIPAL STICKY ESTILO NEW ERA MX CON MATERIAL TRANSLÚCIDO iOS -->
+<header class="ne-header ios-translucent">
+  <div class="ne-header-inner">
+    <!-- IZQUIERDA: Botón Hamburguesa Móvil + Logo Oficial Market Store (Variante 1 Horizontal + Variante 2 Icono) -->
+    <div class="ne-brand-zone">
+      <button
+        type="button"
+        class="ne-hamburger continuous apple-pressable"
+        (click)="toggleMobileDrawer()"
+        aria-label="Abrir menú de colecciones"
+      >
+        <sf-symbol [name]="mobileDrawerOpen() ? 'xmark' : 'line.3.horizontal'" [size]="20" [weight]="2.2" />
+      </button>
+
+      <a routerLink="/catalog" class="ne-brand-link apple-pressable" (click)="resetAndGoCatalog()">
+        <!-- Variante 1: Logo Horizontal Oficial con icono de tienda y tipografía Market Store -->
+        <div class="ne-logo-horizontal-badge continuous">
+          <img
+            src="assets/logos/marketstore-horizontal-white.png"
+            alt="Market Store"
+            class="ne-logo-horizontal-img"
+          />
+        </div>
+        <!-- Variante 2: Icono compacto para pantallas reducidas -->
+        <div class="ne-logo-compact-badge continuous">
+          <img
+            src="assets/logos/marketstore-icon.png"
+            alt="Market Store"
+            class="ne-logo-compact-img"
+          />
+        </div>
+      </a>
+    </div>
+
+    <!-- CENTRO: NAVEGACIÓN EDITORIAL EN MAYÚSCULAS ESTILO NEWERA.MX -->
+    <nav class="ne-main-nav" aria-label="Navegación principal Market Store">
+      <button
+        type="button"
+        class="ne-nav-item apple-pressable"
+        [class.active]="router.url === '/catalog' && market.selectedCategory() === 'all' && !market.onlyAffordable()"
+        (click)="resetAndGoCatalog()"
+      >
+        <span>NUEVOS LANZAMIENTOS</span>
+        <span class="ne-hot-dot"></span>
+      </button>
+
+      <div class="ne-mega-trigger-wrap" (click)="$event.stopPropagation()">
+        <button
+          type="button"
+          class="ne-nav-item apple-pressable"
+          [class.active]="categoriesOpen() || market.selectedCategory() !== 'all'"
+          (click)="toggleCategoriesDropdown()"
+        >
+          <span>COLECCIONES</span>
+          <sf-symbol name="chevron.down" [size]="11" [weight]="2.5" />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        class="ne-nav-item apple-pressable"
+        [class.active]="market.onlyAffordable()"
+        (click)="market.toggleAffordableFromNavbar()"
+      >
+        <span>ALCANZA CON MIS TICKETS</span>
+      </button>
+
+      <a
+        routerLink="/wallet"
+        routerLinkActive="active"
+        class="ne-nav-item apple-pressable"
+        (click)="market.haptic('selection')"
+      >
+        <span>MIS TICKETS</span>
+        @if (market.activeTickets().length > 0) {
+          <span class="ne-nav-badge">{{ market.activeTickets().length }}</span>
+        }
+      </a>
+
+      <a
+        routerLink="/orders"
+        routerLinkActive="active"
+        class="ne-nav-item apple-pressable"
+        (click)="market.haptic('selection')"
+      >
+        <span>MIS COMPRAS</span>
+      </a>
+
+      <a
+        routerLink="/seller"
+        routerLinkActive="active"
+        class="ne-nav-item apple-pressable"
+        (click)="switchRole('seller')"
+      >
+        <span>ESTUDIO VENDEDOR</span>
+      </a>
+    </nav>
+
+    <!-- BUSCADOR iOS (En escritorio a la derecha; en móvil baja a una segunda fila completa) -->
+    <form class="ne-search-pill continuous" (submit)="onSearchSubmit($event)">
+      <sf-symbol name="magnifyingglass" [size]="15" [weight]="2.2" />
+      <input
+        type="search"
+        class="ne-search-input"
+        placeholder="Buscar colección, producto, SKU…"
+        [ngModel]="market.searchQuery()"
+        (ngModelChange)="onSearchInput($event)"
+        name="globalSearch"
+        autocomplete="off"
+      />
+      @if (market.searchQuery()) {
+        <button
+          type="button"
+          class="ne-search-clear"
+          (click)="clearSearch()"
+          aria-label="Limpiar búsqueda"
+        >
+          <sf-symbol name="xmark" [size]="11" [weight]="2.6" />
+        </button>
+      }
+    </form>
+
+    <!-- DERECHA: Píldora de Saldo WalletPay + Cuenta + Tema + Bolsa de Compras + Bloquear -->
+    <div class="ne-actions-zone">
+      <button
+        type="button"
+        class="ne-wallet-pill continuous apple-pressable"
+        (click)="goToWallet()"
+        title="Bóveda sincronizada con WalletPay"
+      >
+        <sf-symbol name="wallet.pass" [size]="15" [weight]="2.1" />
+        <span>{{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }}</span>
+      </button>
+
+      @if (market.currentUser(); as u) {
+        <button
+          type="button"
+          class="ne-user-btn continuous apple-pressable"
+          (click)="market.lockSession('Cambio de cuenta en MarketStore')"
+          title="Cambiar de cuenta ({{ u.email }})"
+        >
+          <span class="ne-avatar" [style.background]="u.avatarHex || '#2B70EA'">{{ u.avatarInitials }}</span>
+          <span class="ne-uname">{{ u.name.split(' ')[0] }}</span>
+        </button>
+      }
+
+      <button
+        type="button"
+        class="ne-icon-btn continuous apple-pressable"
+        (click)="market.toggleTheme()"
+        title="Cambiar apariencia Claro / Oscuro"
+        aria-label="Cambiar apariencia"
+      >
+        <sf-symbol name="circle.lefthalf.filled" [size]="17" />
+      </button>
+
+      <button
+        type="button"
+        class="ne-bag-btn continuous apple-pressable"
+        (click)="openBag()"
+        title="Abrir bolsa de compras"
+        aria-label="Bolsa de compras"
+      >
+        <sf-symbol name="bag.fill" [size]="17" />
+        <span class="ne-bag-label">BOLSA</span>
+        <span class="ne-bag-count">{{ market.cartCount() }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="ne-icon-btn continuous apple-pressable"
+        (click)="market.lockSession('Bloqueo manual de sesión')"
+        title="Cerrar sesión"
+        aria-label="Cerrar sesión"
+      >
+        <sf-symbol name="lock.fill" [size]="16" />
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. MEGA-MENÚ DESPLEGABLE DE COLECCIONES Y GUÍA DE TICKETS (ESTILO NEW ERA MX) -->
+  @if (categoriesOpen()) {
+    <div class="ne-megamenu continuous" (click)="$event.stopPropagation()" role="menu">
+      <div class="ne-mega-inner">
+        <div class="ne-mega-col">
+          <span class="ne-mega-eyebrow">EXPLORAR POR COLECCIÓN</span>
+          <div class="ne-mega-grid">
+            @for (cat of categories; track cat.id) {
+              <button
+                type="button"
+                class="ne-mega-card continuous apple-pressable"
+                [class.selected]="market.selectedCategory() === cat.id"
+                (click)="pickCategory(cat.id)"
+              >
+                <span class="nmc-icon">
+                  <sf-symbol [name]="cat.icon" [size]="18" />
+                </span>
+                <div class="nmc-copy">
+                  <strong>{{ cat.label }}</strong>
+                  <span>{{ cat.tagline }}</span>
+                </div>
+                <sf-symbol name="chevron.right" [size]="12" [weight]="2.4" />
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="ne-mega-brand-card continuous">
+          <div class="nmb-top">
+            <img src="assets/logos/marketstore-horizontal.png" alt="Market Store" class="nmb-logo" />
+            <span class="nmb-tag">GUÍA DE SILUETAS BANCARIAS</span>
+          </div>
+          <p>
+            Adquiere tus tickets en la app móvil <strong>WalletPay</strong> y canjéalos automáticamente en cualquiera de nuestras colecciones oficiales:
+          </p>
+          <div class="nmb-tiers">
+            <span class="nmb-tier card-tier-50">$50 Estándar</span>
+            <span class="nmb-tier card-tier-100">$100 Plata</span>
+            <span class="nmb-tier card-tier-200">$200 Oro</span>
+            <span class="nmb-tier card-tier-500">$500 Titanium</span>
+          </div>
+          <button type="button" class="nmb-cta continuous apple-pressable" (click)="categoriesOpen.set(false); goToWallet()">
+            <span>Ver mi Bóveda de Tickets ({{ market.activeTickets().length }})</span>
+            <sf-symbol name="arrow.up.right" [size]="13" [weight]="2.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</header>
+
+<!-- ============================================================================
+     DRAWER LATERAL MÓVIL ESTILO NEW ERA MX + iOS
+     ============================================================================ -->
+@if (mobileDrawerOpen()) {
+  <div class="ne-scrim" (click)="mobileDrawerOpen.set(false)" role="presentation"></div>
+  <aside class="ne-mobile-drawer continuous" role="dialog" aria-label="Menú principal">
+    <div class="nmd-brand-head">
+      <img src="assets/logos/marketstore-horizontal.png" alt="Market Store" class="nmd-brand-logo" />
+      <button type="button" class="nmd-close" (click)="mobileDrawerOpen.set(false)">
+        <sf-symbol name="xmark" [size]="14" [weight]="2.6" />
+      </button>
+    </div>
+
+    @if (market.currentUser(); as u) {
+      <div class="nmd-profile">
+        <div class="nmd-user-row">
+          <span class="nmd-avatar" [style.background]="u.avatarHex || '#2B70EA'">{{ u.avatarInitials }}</span>
+          <div class="nmd-user-meta">
+            <strong>{{ u.name }}</strong>
+            <span>{{ u.email }}</span>
+          </div>
+        </div>
+
+        <div class="nmd-wallet-box continuous" (click)="goToWallet(); mobileDrawerOpen.set(false)">
+          <div>
+            <small>PODER DE COMPRA WALLETPAY</small>
+            <strong>{{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
+          </div>
+          <span class="nmd-tk-count">{{ market.activeTickets().length }} tickets ›</span>
+        </div>
+
+        <div class="nmd-role-seg">
+          <button
+            type="button"
+            [class.active]="u.role === 'buyer'"
+            (click)="switchRole('buyer'); mobileDrawerOpen.set(false)"
+          >
+            Comprador
+          </button>
+          <button
+            type="button"
+            [class.active]="u.role === 'seller'"
+            (click)="switchRole('seller'); mobileDrawerOpen.set(false)"
+          >
+            Vendedor
+          </button>
+        </div>
+      </div>
+    }
+
+    <nav class="nmd-list">
+      <div class="nmd-sec-title">COLECCIONES NEW ERA · MARKET STORE</div>
+      @for (cat of categories; track cat.id) {
+        <button
+          type="button"
+          class="nmd-item"
+          [class.active]="market.selectedCategory() === cat.id"
+          (click)="pickCategory(cat.id); mobileDrawerOpen.set(false)"
+        >
+          <sf-symbol [name]="cat.icon" [size]="17" />
+          <span>{{ cat.label }}</span>
+        </button>
+      }
+
+      <div class="nmd-sec-title">MI CUENTA Y BÓVEDA</div>
+      <button
+        type="button"
+        class="nmd-item"
+        [class.active]="market.onlyAffordable()"
+        (click)="market.toggleAffordableFromNavbar(); mobileDrawerOpen.set(false)"
+      >
+        <sf-symbol name="checkmark.seal.fill" [size]="18" />
+        <span>Alcanza con mis Tickets</span>
+      </button>
+
+      <a routerLink="/wallet" routerLinkActive="active" class="nmd-item" (click)="mobileDrawerOpen.set(false)">
+        <sf-symbol name="wallet.pass" [size]="18" />
+        <span>Mis Tickets WalletPay</span>
+        @if (market.activeTickets().length > 0) {
+          <span class="nmd-badge">{{ market.activeTickets().length }}</span>
+        }
+      </a>
+
+      <a routerLink="/orders" routerLinkActive="active" class="nmd-item" (click)="mobileDrawerOpen.set(false)">
+        <sf-symbol name="bag.fill" [size]="18" />
+        <span>Mis Compras</span>
+      </a>
+
+      <a routerLink="/seller" routerLinkActive="active" class="nmd-item" (click)="switchRole('seller'); mobileDrawerOpen.set(false)">
+        <sf-symbol name="chart.bar.fill" [size]="18" />
+        <span>Estudio Vendedor</span>
+      </a>
+
+      <button type="button" class="nmd-item" (click)="market.toggleTheme()">
+        <sf-symbol name="circle.lefthalf.filled" [size]="18" />
+        <span>Cambiar Apariencia (Claro / Oscuro)</span>
+      </button>
+
+      <button
+        type="button"
+        class="nmd-item danger"
+        (click)="mobileDrawerOpen.set(false); market.lockSession('Cierre de sesión desde menú móvil')"
+      >
+        <sf-symbol name="lock.fill" [size]="18" />
+        <span>Cerrar Sesión / Cambiar Cuenta</span>
+      </button>
+    </nav>
+  </aside>
+}
+
+<!-- BARRA INFERIOR MÓVIL ESTILO iOS (< 960px) -->
+<nav class="mobile-tab-bar ios-translucent" aria-label="Navegación móvil inferior">
+  <a routerLink="/catalog" routerLinkActive="active" class="tab-btn" (click)="market.haptic('selection')">
+    <sf-symbol name="house.fill" [size]="21" />
+    <span>Tienda</span>
+  </a>
+  <button type="button" class="tab-btn" [class.active]="mobileDrawerOpen()" (click)="toggleMobileDrawer()">
+    <sf-symbol name="square.grid.2x2" [size]="21" />
+    <span>Colecciones</span>
+  </button>
+  <a routerLink="/wallet" routerLinkActive="active" class="tab-btn" (click)="market.haptic('selection')">
+    <div class="tab-icon-wrap">
+      <sf-symbol name="wallet.pass" [size]="21" />
+      @if (market.activeTickets().length > 0) {
+        <span class="tab-badge">{{ market.activeTickets().length }}</span>
+      }
+    </div>
+    <span>Tickets</span>
+  </a>
+  <a routerLink="/orders" routerLinkActive="active" class="tab-btn" (click)="market.haptic('selection')">
+    <sf-symbol name="bag" [size]="21" />
+    <span>Pedidos</span>
+  </a>
+  <a routerLink="/seller" routerLinkActive="active" class="tab-btn" (click)="switchRole('seller')">
+    <sf-symbol name="chart.bar.fill" [size]="21" />
+    <span>Vender</span>
+  </a>
+</nav>

@@ -1,0 +1,13 @@
+<ion-app>
+  <!-- HUD biométrico nativo de iOS (Face ID) con material translúcido -->
+  @if (wallet.dynamicIslandState().expanded) {
+    <div class="faceid-backdrop" role="status" aria-live="polite">
+      <div class="faceid-hud continuous">
+        <sf-symbol class="faceid-glyph" name="faceid" [size]="48" [weight]="1.9" />
+        <span class="faceid-label">{{ wallet.dynamicIslandState().label }}</span>
+      </div>
+    </div>
+  }
+
+  <ion-router-outlet></ion-router-outlet>
+</ion-app>

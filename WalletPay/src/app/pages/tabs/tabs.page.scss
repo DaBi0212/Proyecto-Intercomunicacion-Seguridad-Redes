@@ -1,0 +1,14 @@
+ion-tab-bar {
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+ion-tab-button {
+  --color: var(--ios-label-2);
+  --color-selected: var(--ion-color-primary);
+  gap: 2px;
+}
+ion-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}

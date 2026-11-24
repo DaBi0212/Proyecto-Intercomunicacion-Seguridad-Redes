@@ -1,0 +1,445 @@
+<div class="page-container">
+  <!-- ENCABEZADO DEL PORTAL DE VENDEDOR -->
+  <header class="seller-head">
+    <div>
+      <span class="eyebrow">CENTRO DE COMERCIO · CONTROL DE ACCESO VENDEDOR</span>
+      <h1>Panel de Vendedor · {{ market.currentUser()?.storeName || 'Aether Studio Oficial' }}</h1>
+      <p>Administra tu catálogo, gestiona envíos y audita la liquidación de tickets con el Banco Central.</p>
+    </div>
+
+    <div class="head-actions">
+      <div class="ios-segmented" role="tablist">
+        <button
+          type="button"
+          class="ios-segment-btn"
+          [class.active]="tab() === 'inventory'"
+          (click)="setTab('inventory')"
+        >
+          Mis Productos ({{ market.products().length }})
+        </button>
+        <button
+          type="button"
+          class="ios-segment-btn"
+          [class.active]="tab() === 'orders'"
+          (click)="setTab('orders')"
+        >
+          Ventas y Tickets ({{ market.orders().length }})
+        </button>
+        <button
+          type="button"
+          class="ios-segment-btn"
+          [class.active]="tab() === 'verifier'"
+          (click)="setTab('verifier')"
+        >
+          Auditar Ticket
+        </button>
+      </div>
+
+      <button type="button" class="new-prod-btn continuous apple-pressable" (click)="openProductModal()">
+        <sf-symbol name="plus" [size]="16" [weight]="2.6" />
+        <span>Publicar Producto</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- WIDGETS KPI ESTILO iOS -->
+  <section class="kpi-grid">
+    <div class="kpi-card continuous">
+      <div class="kpi-top">
+        <span class="kpi-icon green continuous">
+          <sf-symbol name="building.columns" [size]="18" />
+        </span>
+        <span class="kpi-tag">Liquidado Banco Central</span>
+      </div>
+      <strong class="kpi-val is-green">
+        {{ market.totalSellerRevenue() | currency: 'MXN' : 'symbol-narrow' }}
+      </strong>
+      <span class="kpi-sub">100% respaldado por tickets verificados</span>
+    </div>
+
+    <div class="kpi-card continuous">
+      <div class="kpi-top">
+        <span class="kpi-icon blue continuous">
+          <sf-symbol name="ticket" [size]="18" />
+        </span>
+        <span class="kpi-tag">Sello Bancario</span>
+      </div>
+      <strong class="kpi-val">{{ market.totalVerifiedTicketsCount() }} Tickets</strong>
+      <span class="kpi-sub">0 rechazos por doble gasto</span>
+    </div>
+
+    <div class="kpi-card continuous">
+      <div class="kpi-top">
+        <span class="kpi-icon purple continuous">
+          <sf-symbol name="cube.box" [size]="18" />
+        </span>
+        <span class="kpi-tag">Catálogo Activo</span>
+      </div>
+      <strong class="kpi-val">
+        {{ market.activeProducts().length }} / {{ market.products().length }}
+      </strong>
+      <span class="kpi-sub">Productos visibles en tienda</span>
+    </div>
+
+    <div class="kpi-card continuous">
+      <div class="kpi-top">
+        <span class="kpi-icon amber continuous">
+          <sf-symbol name="truck.box" [size]="18" />
+        </span>
+        <span class="kpi-tag">Logística</span>
+      </div>
+      <strong class="kpi-val">{{ market.orders().length }} Órdenes</strong>
+      <span class="kpi-sub">Verificadas para despacho</span>
+    </div>
+  </section>
+
+  <!-- PESTAÑA 1: INVENTARIO DE PRODUCTOS -->
+  @if (tab() === 'inventory') {
+    <section class="inventory-section">
+      @if (market.products().length === 0) {
+        <div class="empty-inv-card continuous">
+          <div class="eic-icon continuous">
+            <sf-symbol name="photo.on.rectangle" [size]="34" />
+          </div>
+          <h3>El catálogo está vacío</h3>
+          <p>Publica tus propios productos subiendo sus fotografías o imágenes oficiales para mostrarlos en Market Store.</p>
+          <button type="button" class="new-prod-btn continuous apple-pressable" (click)="openProductModal()">
+            <sf-symbol name="plus" [size]="16" [weight]="2.6" />
+            <span>Subir Imagen y Publicar Producto</span>
+          </button>
+        </div>
+      } @else {
+        <div class="inv-grid">
+          @for (p of market.products(); track p.id) {
+            <article class="inv-card continuous" [class.paused]="!p.active">
+              <div class="inv-top">
+                <div class="inv-thumb continuous" [class]="'inv-thumb continuous ' + p.surfaceClass">
+                  @if (p.imageUrl) {
+                    <img [src]="p.imageUrl" [alt]="p.title" class="inv-thumb-img" />
+                  } @else {
+                    <sf-symbol [name]="p.symbolName" [size]="28" />
+                  }
+                </div>
+                <div class="inv-title-wrap">
+                  <div class="inv-badges">
+                    <span class="sku-pill mono">{{ p.sku }}</span>
+                    <span class="state-pill" [class.off]="!p.active">
+                      {{ p.active ? 'En venta' : 'Pausado' }}
+                    </span>
+                  </div>
+                  <h3>{{ p.title }}</h3>
+                  <span class="inv-cat">{{ p.categoryLabel }} · Equivalencia: {{ p.badge }}</span>
+                </div>
+              </div>
+
+              <div class="inv-metrics">
+                <div>
+                  <span class="m-lbl">PRECIO OFICIAL</span>
+                  <strong class="m-val">{{ p.price | currency: 'MXN' : 'symbol-narrow' }} MXN</strong>
+                </div>
+                <div>
+                  <span class="m-lbl">INVENTARIO</span>
+                  <strong class="m-val" [class.low]="p.stock <= 5">{{ p.stock }} unidades</strong>
+                </div>
+              </div>
+
+              <div class="inv-actions">
+                <button type="button" class="act-btn continuous apple-pressable" (click)="editProduct(p)">
+                  <sf-symbol name="pencil" [size]="14" />
+                  <span>Editar</span>
+                </button>
+                <button
+                  type="button"
+                  class="act-btn continuous apple-pressable"
+                  (click)="market.toggleProductActive(p.id)"
+                >
+                  <span>{{ p.active ? 'Pausar' : 'Activar' }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="act-btn danger continuous apple-pressable"
+                  (click)="market.deleteProduct(p.id)"
+                  aria-label="Eliminar producto"
+                >
+                  <sf-symbol name="trash" [size]="14" />
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  <!-- PESTAÑA 2: ÓRDENES Y LIQUIDACIÓN DE TICKETS -->
+  @if (tab() === 'orders') {
+    <section class="seller-orders">
+      @for (ord of market.orders(); track ord.id) {
+        <article class="s-order-card continuous">
+          <div class="so-header">
+            <div>
+              <span class="mono so-id">Orden #{{ ord.id }}</span>
+              <h3>Cliente: {{ ord.buyerName }} ({{ ord.buyerEmail }})</h3>
+              <span class="so-date">{{ ord.createdAt }} · Autorización Banco: <strong class="mono">{{ ord.bankVerificationCode }}</strong></span>
+            </div>
+
+            <div class="so-status-box">
+              <span class="status-pill" [attr.data-status]="ord.status">{{ statusLabel(ord.status) }}</span>
+              @if (ord.status !== 'delivered') {
+                <button
+                  type="button"
+                  class="advance-btn continuous apple-pressable"
+                  (click)="market.advanceOrderStatus(ord.id)"
+                >
+                  <sf-symbol name="truck.box" [size]="15" />
+                  <span>Avanzar a: {{ nextStatusLabel(ord.status) }}</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="so-body">
+            <div class="so-col">
+              <span class="col-label">PRODUCTOS VENDIDOS</span>
+              @for (it of ord.items; track it.productId) {
+                <div class="so-line">
+                  <span>{{ it.quantity }}× {{ it.title }}</span>
+                  <strong>{{ it.unitPrice * it.quantity | currency: 'MXN' : 'symbol-narrow' }}</strong>
+                </div>
+              }
+            </div>
+
+            <div class="so-col">
+              <span class="col-label">TICKETS BANCARIOS RECIBIDOS Y VALIDADOS</span>
+              @for (tk of ord.ticketsUsed; track tk.id) {
+                <div class="so-ticket-row">
+                  <span class="tk-badge" [class]="'tk-badge ' + tk.colorClass">{{ '$' + tk.amount }}</span>
+                  <strong class="mono">{{ tk.id }}</strong>
+                  <span class="mono hash">{{ tk.signatureHash }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+  }
+
+  <!-- PESTAÑA 3: AUDITOR / VERIFICADOR DE TICKETS CON EL BANCO CENTRAL -->
+  @if (tab() === 'verifier') {
+    <section class="verifier-box continuous">
+      <div class="ver-head">
+        <span class="ver-icon continuous">
+          <sf-symbol name="shield.checkered" [size]="28" />
+        </span>
+        <div>
+          <h2>Verificador de Validez de Tickets (Paso 6)</h2>
+          <p>
+            Comprueba en tiempo real con el Banco Central la autenticidad, vigencia y estado de no-doble-gasto de cualquier ticket presentado.
+          </p>
+        </div>
+      </div>
+
+      <div class="ver-search">
+        <input
+          type="text"
+          class="ver-input mono"
+          placeholder="Escribe o selecciona un folio (ej. TKT-9941-A8F2)"
+          [(ngModel)]="queryFolio"
+        />
+        <button type="button" class="advance-btn continuous apple-pressable" (click)="verifyFolioWithBank()">
+          <sf-symbol name="checkmark.seal.fill" [size]="15" />
+          <span>Consultar al Banco</span>
+        </button>
+      </div>
+
+      @if (verifierMessage()) {
+        <p class="so-date" style="margin: 6px 0 10px;">{{ verifierMessage() }}</p>
+      }
+
+      <div class="ver-quick-pills">
+        <span>Probar con folios registrados:</span>
+        @for (t of market.tickets(); track t.id) {
+          <button type="button" class="q-folio mono apple-pressable" (click)="selectFolioForAudit(t.id)">
+            {{ t.id }} ({{ t.status === 'active' ? 'Activo' : 'Usado' }})
+          </button>
+        }
+      </div>
+
+      @if (inspectedTicket(); as tk) {
+        <div class="ver-result continuous" [class.used]="tk.status === 'used'">
+          <div class="vr-top">
+            <div>
+              <span class="vr-label">RESULTADO DE AUDITORÍA EN BANCO CENTRAL</span>
+              <h3>
+                {{
+                  !market.isTicketAuthentic(tk)
+                    ? 'Ticket Inválido (Datos o Sello Alterados)'
+                    : tk.status === 'active'
+                    ? 'Ticket Válido y Vigente para Compra'
+                    : 'Ticket Ya Canjeado (Protección Anti-Doble-Gasto Activa)'
+                }}
+              </h3>
+            </div>
+            <span class="vr-Amount">{{ '$' + tk.amount }}.00 MXN</span>
+          </div>
+
+          <div class="vr-grid">
+            <div>
+              <span>Folio Oficial</span>
+              <strong class="mono">{{ tk.id }}</strong>
+            </div>
+            <div>
+              <span>Nivel / Serie</span>
+              <strong>{{ tk.tier }}</strong>
+            </div>
+            <div>
+              <span>Emisión</span>
+              <strong>{{ tk.issuedAt }}</strong>
+            </div>
+            <div>
+              <span>Sello de Autenticidad</span>
+              <strong class="mono">{{ tk.signatureHash }}</strong>
+            </div>
+          </div>
+        </div>
+      }
+    </section>
+  }
+
+  <!-- MODAL iOS PARA PUBLICAR O EDITAR PRODUCTO -->
+  @if (modalOpen()) {
+    <div class="modal-scrim" (click)="modalOpen.set(false)" role="presentation"></div>
+    <div class="prod-modal continuous" role="dialog" aria-modal="true">
+      <div class="sheet-head">
+        <span class="sheet-title">{{ editingId() ? 'Editar Producto' : 'Publicar Nuevo Producto' }}</span>
+        <button type="button" class="sheet-close apple-pressable" (click)="modalOpen.set(false)">
+          <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- SECCIÓN DE SUBIDA DE IMÁGENES DEL PRODUCTO -->
+        <div class="img-upload-section continuous">
+          <div class="ius-head">
+            <div>
+              <strong>Imágenes del Producto</strong>
+              <span>Sube una o varias fotos desde tu dispositivo para mostrarlas en el catálogo.</span>
+            </div>
+            <label class="ius-upload-btn continuous apple-pressable">
+              <sf-symbol name="plus" [size]="14" [weight]="2.6" />
+              <span>Subir Imagen</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                (change)="onProductImagesSelected($event)"
+              />
+            </label>
+          </div>
+
+          @if (formImages().length === 0) {
+            <label class="ius-dropzone continuous apple-pressable">
+              <sf-symbol name="photo.on.rectangle" [size]="30" />
+              <strong>Toca aquí para seleccionar fotos del producto</strong>
+              <span>Formatos soportados: JPG, PNG, WEBP · Puedes elegir varias imágenes</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                (change)="onProductImagesSelected($event)"
+              />
+            </label>
+          } @else {
+            <div class="ius-gallery">
+              @for (img of formImages(); track $index; let idx = $index) {
+                <div
+                  class="ius-thumb continuous"
+                  [class.is-main]="formMainImage() === img"
+                  (click)="setMainImage(img)"
+                >
+                  <img [src]="img" alt="Vista previa del producto" />
+                  @if (formMainImage() === img) {
+                    <span class="ius-main-badge">PORTADA</span>
+                  }
+                  <button
+                    type="button"
+                    class="ius-remove-btn"
+                    title="Quitar imagen"
+                    (click)="$event.stopPropagation(); removeUploadedImage(idx)"
+                  >
+                    <sf-symbol name="xmark" [size]="10" [weight]="2.8" />
+                  </button>
+                </div>
+              }
+              <label class="ius-add-more continuous apple-pressable" title="Agregar otra imagen">
+                <sf-symbol name="plus" [size]="20" />
+                <span>Agregar</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  (change)="onProductImagesSelected($event)"
+                />
+              </label>
+            </div>
+          }
+        </div>
+
+        <div class="ios-form-group continuous">
+          <label class="f-row">
+            <span>Título</span>
+            <input type="text" placeholder="Ej. Gorra New Era 59FIFTY / Base MagSafe" [(ngModel)]="formTitle" />
+          </label>
+          <label class="f-row">
+            <span>Subtítulo</span>
+            <input type="text" placeholder="Ej. Edición oficial verificada" [(ngModel)]="formSubtitle" />
+          </label>
+          <label class="f-row">
+            <span>Categoría</span>
+            <select [(ngModel)]="formCategory">
+              <option value="magsafe">Accesorios MagSafe</option>
+              <option value="audio">Audio y Música</option>
+              <option value="hogar">Hogar Inteligente</option>
+              <option value="estudio">Cómputo y Estudio</option>
+              <option value="digital">Tarjetas y Digital</option>
+            </select>
+          </label>
+          <label class="f-row">
+            <span>Precio (MXN)</span>
+            <input type="number" step="50" min="50" [(ngModel)]="formPrice" />
+          </label>
+          <label class="f-row">
+            <span>Stock</span>
+            <input type="number" min="1" [(ngModel)]="formStock" />
+          </label>
+        </div>
+
+        <!-- Botones rápidos de precio alineado con denominaciones de Tickets ($50, $100, $200, $500) -->
+        <div class="price-presets">
+          <span>Precios sugeridos en Tickets:</span>
+          @for (p of [50, 100, 150, 200, 250, 500]; track p) {
+            <button type="button" class="preset-chip" [class.active]="formPrice === p" (click)="formPrice = p">
+              {{ '$' + p }}
+            </button>
+          }
+        </div>
+
+        <textarea
+          class="ios-textarea continuous"
+          rows="3"
+          placeholder="Descripción detallada del producto..."
+          [(ngModel)]="formDesc"
+        ></textarea>
+
+        <button type="button" class="save-btn continuous apple-pressable" (click)="saveProduct()">
+          <sf-symbol name="checkmark.circle.fill" [size]="19" />
+          <span>{{ editingId() ? 'Guardar Cambios' : 'Publicar en Catálogo' }}</span>
+        </button>
+      </div>
+    </div>
+  }
+</div>

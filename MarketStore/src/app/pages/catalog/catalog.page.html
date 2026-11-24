@@ -1,0 +1,431 @@
+<div class="ne-storefront">
+  <!-- ==========================================================================
+       1. PÍLDORAS RÁPIDAS DE COLECCIÓN (DESLIZABLES EN MÓVIL Y ESCRITORIO)
+       ========================================================================== -->
+  <div class="ne-categories-scroll" role="tablist" aria-label="Colecciones Market Store">
+    @for (cat of categories; track cat.id) {
+      <button
+        type="button"
+        role="tab"
+        class="ne-cat-pill continuous apple-pressable"
+        [class.active]="selectedCategory() === cat.id"
+        (click)="selectCategory(cat.id)"
+      >
+        <sf-symbol [name]="cat.icon" [size]="14" />
+        <span>{{ cat.label }}</span>
+      </button>
+    }
+  </div>
+
+  <!-- ==========================================================================
+       2. ENCABEZADO CENTRADO + BARRA "FILTRAR | X PRODUCTOS | [2x2] [1x1]"
+          (DISPOSICIÓN Y ORGANIZACIÓN 1:1 CON LA IMAGEN DE REFERENCIA DE NEW ERA)
+       ========================================================================== -->
+  <header class="ne-collection-header">
+    <h1 class="ne-collection-title">{{ activeCategoryTitle() }}</h1>
+
+    <div class="ne-control-bar">
+      <!-- Izquierda: Botón Filtrar con icono de controles deslizantes -->
+      <button
+        type="button"
+        class="ne-filter-trigger apple-pressable"
+        [class.active]="filterDrawerOpen() || hasActiveFilters()"
+        (click)="filterDrawerOpen.set(!filterDrawerOpen())"
+      >
+        <svg class="ne-sliders-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <circle cx="9" cy="7" r="2.3" fill="var(--ion-background-color)" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+          <circle cx="15" cy="17" r="2.3" fill="var(--ion-background-color)" />
+        </svg>
+        <span>Filtrar</span>
+        @if (activeFiltersCount() > 0) {
+          <span class="ne-filter-count">{{ activeFiltersCount() }}</span>
+        }
+      </button>
+
+      <!-- Centro: Contador de productos -->
+      <span class="ne-products-count">{{ filteredProducts().length }} productos</span>
+
+      <!-- Derecha: Selector de vista Cuadrícula (2x2) vs Columna única (1x1) idéntico a la imagen -->
+      <div class="ne-view-switcher" role="group" aria-label="Cambiar disposición de cuadrícula">
+        <button
+          type="button"
+          class="ne-view-btn apple-pressable"
+          [class.active]="gridMode() === 'multi'"
+          (click)="gridMode.set('multi')"
+          aria-label="Vista de 2 columnas en móvil y 4 en escritorio"
+          title="Vista cuadrícula"
+        >
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7">
+            <rect x="2.5" y="2.5" width="6" height="6" rx="1" />
+            <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
+            <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
+            <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="ne-view-btn apple-pressable"
+          [class.active]="gridMode() === 'single'"
+          (click)="gridMode.set('single')"
+          aria-label="Vista de 1 columna amplia"
+          title="Vista ampliada"
+        >
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7">
+            <rect x="2.5" y="2.5" width="15" height="15" rx="1.4" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Chips de filtros activos (si el usuario aplicó algún filtro) -->
+    @if (hasActiveFilters()) {
+      <div class="ne-active-chips">
+        @if (onlyAffordable()) {
+          <button type="button" class="ne-chip continuous" (click)="toggleAffordable()">
+            <span>Alcanza con mi saldo ({{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }})</span>
+            <sf-symbol name="xmark" [size]="10" [weight]="2.6" />
+          </button>
+        }
+        @if (selectedDenom(); as d) {
+          <button type="button" class="ne-chip continuous" (click)="selectDenom(null)">
+            <span>Ticket {{ '$' + d }} MXN</span>
+            <sf-symbol name="xmark" [size]="10" [weight]="2.6" />
+          </button>
+        }
+        @if (onlyInStock()) {
+          <button type="button" class="ne-chip continuous" (click)="onlyInStock.set(false)">
+            <span>En existencia</span>
+            <sf-symbol name="xmark" [size]="10" [weight]="2.6" />
+          </button>
+        }
+        <button type="button" class="ne-chip-reset" (click)="resetFilters()">
+          Limpiar todo
+        </button>
+      </div>
+    }
+  </header>
+
+  <!-- ==========================================================================
+       3. DRAWER / SHEET DESPLEGABLE DE FILTROS Y ORDENAMIENTO (ESTILO iOS + NEW ERA)
+       ========================================================================== -->
+  @if (filterDrawerOpen()) {
+    <div class="modal-scrim" (click)="filterDrawerOpen.set(false)" role="presentation"></div>
+    <aside class="ne-filter-drawer continuous" role="dialog" aria-modal="true" aria-label="Filtros y ordenamiento">
+      <div class="nfd-head">
+        <div class="nfd-title-row">
+          <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nfd-logo" />
+          <strong>Filtrar y Ordenar</strong>
+        </div>
+        <button type="button" class="sheet-close apple-pressable" (click)="filterDrawerOpen.set(false)">
+          <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+        </button>
+      </div>
+
+      <div class="nfd-body">
+        <!-- Ordenar por -->
+        <div class="nfs-group">
+          <div class="nfs-group-title">ORDENAR POR</div>
+          <div class="nfs-sort-grid">
+            @for (opt of sortOptions; track opt.id) {
+              <button
+                type="button"
+                class="nfs-sort-btn continuous apple-pressable"
+                [class.selected]="sortBy() === opt.id"
+                (click)="sortBy.set(opt.id)"
+              >
+                <span>{{ opt.label }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Poder de compra WalletPay -->
+        <div class="nfs-group">
+          <div class="nfs-group-title">TOTAL EN TU WALLETPAY</div>
+          <button
+            type="button"
+            class="nfs-afford-toggle continuous apple-pressable"
+            [class.active]="onlyAffordable()"
+            (click)="toggleAffordable()"
+          >
+            <div class="nat-copy">
+              <strong>Alcanza con mis tickets</strong>
+              <span>Saldo disponible: {{ market.totalPurchasingPower() | currency: 'MXN' : 'symbol-narrow' }} MXN</span>
+            </div>
+            <span class="ios-switch" [class.on]="onlyAffordable()">
+              <span class="ios-knob"></span>
+            </span>
+          </button>
+        </div>
+
+        <!-- Colección -->
+        <div class="nfs-group">
+          <div class="nfs-group-title">COLECCIÓN</div>
+          <div class="nfs-list">
+            @for (cat of categories; track cat.id) {
+              <button
+                type="button"
+                class="nfs-check-row apple-pressable"
+                [class.selected]="selectedCategory() === cat.id"
+                (click)="selectCategory(cat.id)"
+              >
+                <span class="nfs-radio" [class.checked]="selectedCategory() === cat.id"></span>
+                <span class="nfs-lbl">{{ cat.label }}</span>
+                <span class="nfs-badge">{{ getCategoryCount(cat.id) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Silueta de Ticket -->
+        <div class="nfs-group">
+          <div class="nfs-group-title">DENOMINACIÓN DE TICKET</div>
+          <div class="nfs-denom-grid">
+            @for (d of ticketDenominations; track d.amount) {
+              <button
+                type="button"
+                class="nfs-denom-btn continuous apple-pressable"
+                [class.selected]="selectedDenom() === d.amount"
+                (click)="selectDenom(selectedDenom() === d.amount ? null : d.amount)"
+              >
+                <strong>{{ '$' + d.amount }} MXN</strong>
+                <span>Ticket {{ d.name }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Disponibilidad -->
+        <div class="nfs-group">
+          <div class="nfs-group-title">DISPONIBILIDAD</div>
+          <button
+            type="button"
+            class="nfs-check-row apple-pressable"
+            [class.selected]="onlyInStock()"
+            (click)="onlyInStock.set(!onlyInStock())"
+          >
+            <span class="nfs-radio" [class.checked]="onlyInStock()"></span>
+            <span class="nfs-lbl">Solo productos en existencia</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="nfd-foot">
+        <button type="button" class="nfd-clear continuous apple-pressable" (click)="resetFilters()">
+          Limpiar
+        </button>
+        <button type="button" class="nfd-apply continuous apple-pressable" (click)="filterDrawerOpen.set(false)">
+          Ver {{ filteredProducts().length }} productos
+        </button>
+      </div>
+    </aside>
+  }
+
+  <!-- ==========================================================================
+       4. CUADRÍCULA DE PRODUCTOS (DISPOSICIÓN 1:1 CON LA IMAGEN ADJUNTADA:
+          2 COLUMNAS EN MÓVIL / 4 EN ESCRITORIO, IMAGEN + LÍNEA + TÍTULO + PRECIO + BOTÓN [+])
+       ========================================================================== -->
+  <section class="ne-product-grid" [class.single-col]="gridMode() === 'single'">
+    @for (p of filteredProducts(); track p.id) {
+      <article class="ne-card continuous">
+        <!-- Contenedor visual del producto con imagen real subida o icono + sello en esquina superior derecha -->
+        <div
+          class="ne-card-visual continuous apple-pressable"
+          [class]="'ne-card-visual continuous apple-pressable ' + p.surfaceClass"
+          (click)="openDetail(p)"
+        >
+          @if (p.imageUrl) {
+            <img [src]="p.imageUrl" [alt]="p.title" class="ne-card-img" loading="lazy" />
+          } @else {
+            <div class="ne-card-glyph" [style.color]="p.accentColor">
+              <sf-symbol [name]="p.symbolName" [size]="52" [weight]="1.55" />
+            </div>
+          }
+
+          <span class="ne-corner-seal" title="Ver detalle del producto">
+            <img src="assets/logos/marketstore-icon.png" alt="Market Store" />
+          </span>
+        </div>
+
+        <!-- Línea divisoria horizontal estilo New Era MX (debajo del producto) -->
+        <div class="ne-card-Rule" aria-hidden="true">
+          <span class="ne-card-rule-active"></span>
+        </div>
+
+        <!-- Cuerpo de tarjeta: Etiqueta superior + Título + Fila inferior (Precio a la izquierda y botón [+] a la derecha) -->
+        <div class="ne-card-info">
+          <span class="ne-card-eyebrow">{{ p.badge || p.categoryLabel }}</span>
+
+          <h3 class="ne-card-title" (click)="openDetail(p)">
+            {{ p.title }}
+          </h3>
+
+          <div class="ne-card-bottom">
+            <strong class="ne-card-price">
+              {{ p.price | currency: 'MXN' : 'symbol-narrow' }}
+            </strong>
+
+            <button
+              type="button"
+              class="ne-plus-btn continuous apple-pressable"
+              [disabled]="p.stock <= 0"
+              (click)="buyNowWithTicket(p)"
+              [attr.aria-label]="'Agregar ' + p.title + ' a la bolsa'"
+              title="Canjear o agregar a la bolsa"
+            >
+              <sf-symbol name="plus" [size]="15" [weight]="2.4" />
+            </button>
+          </div>
+        </div>
+      </article>
+    }
+  </section>
+
+  <!-- ==========================================================================
+       5. FOOTER COMPACTO CON LAS 2 VARIANTES DEL LOGO DE MARKET STORE
+       ========================================================================== -->
+  <footer class="ne-footer continuous">
+    <div class="nef-top">
+      <div class="nef-brand-col">
+        <div class="nef-logos-row">
+          <img src="assets/logos/marketstore-horizontal.png" alt="Market Store" class="nef-logo-h" />
+          <img src="assets/logos/marketstore-icon.png" alt="Market Store Icono" class="nef-logo-sq" />
+        </div>
+        <p>
+          Tienda oficial sincronizada con la bóveda móvil <strong>WalletPay</strong> y validación automática del <strong>Banco Central</strong>.
+        </p>
+      </div>
+
+      <div class="nef-links-col">
+        <strong>COLECCIONES</strong>
+        @for (cat of categories; track cat.id) {
+          <button type="button" (click)="selectCategory(cat.id)">{{ cat.label }}</button>
+        }
+      </div>
+
+      <div class="nef-links-col">
+        <strong>TICKETS WALLETPAY</strong>
+        @for (d of ticketDenominations; track d.amount) {
+          <button type="button" (click)="selectDenom(d.amount)">
+            Ticket {{ '$' + d.amount }} MXN · {{ d.name }}
+          </button>
+        }
+      </div>
+
+      <div class="nef-links-col">
+        <strong>MI CUENTA</strong>
+        <button type="button" (click)="goToWallet()">Mis Tickets ({{ market.activeTickets().length }})</button>
+        <button type="button" (click)="market.cartOpen.set(true)">Bolsa de Compras ({{ market.cartCount() }})</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL / SHEET DE DETALLE DE PRODUCTO ESTILO iOS -->
+  @if (selectedProduct(); as prod) {
+    <div class="modal-scrim" (click)="selectedProduct.set(null)" role="presentation"></div>
+    <div class="detail-sheet continuous" role="dialog" aria-modal="true">
+      <div class="sheet-head">
+        <div class="sh-brand">
+          <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="sh-logo" />
+          <span class="sheet-title">Detalle del Producto</span>
+        </div>
+        <button type="button" class="sheet-close apple-pressable" (click)="selectedProduct.set(null)">
+          <sf-symbol name="xmark" [size]="13" [weight]="2.8" />
+        </button>
+      </div>
+
+      <div class="detail-content">
+        <div class="detail-visual continuous" [class]="'detail-visual continuous ' + prod.surfaceClass">
+          @if (activeDetailImage() || prod.imageUrl) {
+            <img
+              [src]="activeDetailImage() || prod.imageUrl"
+              [alt]="prod.title"
+              class="detail-main-img continuous"
+            />
+          } @else {
+            <div class="dv-glyph" [style.color]="prod.accentColor">
+              <sf-symbol [name]="prod.symbolName" [size]="68" [weight]="1.6" />
+            </div>
+          }
+
+          @if (prod.images && prod.images.length > 1) {
+            <div class="dv-thumbs">
+              @for (img of prod.images; track $index) {
+                <button
+                  type="button"
+                  class="dv-thumb continuous apple-pressable"
+                  [class.active]="(activeDetailImage() || prod.imageUrl) === img"
+                  (click)="activeDetailImage.set(img)"
+                >
+                  <img [src]="img" [alt]="prod.title" />
+                </button>
+              }
+            </div>
+          }
+
+          <div class="dv-badges">
+            <span class="dv-badge">{{ prod.categoryLabel }}</span>
+            <span class="dv-badge mono">{{ prod.sku }}</span>
+            <span class="dv-badge">★ {{ prod.rating }} ({{ prod.reviewsCount }} reseñas)</span>
+          </div>
+        </div>
+
+        <div class="detail-info">
+          <h2>{{ prod.title }}</h2>
+          <p class="detail-desc">{{ prod.description }}</p>
+
+          <div class="ticket-match-box continuous">
+            <span class="tm-label">COMBINACIÓN SUGERIDA DE TICKETS WALLETPAY</span>
+            <div class="tm-pills">
+              @for (denom of prod.recommendedTickets; track $index) {
+                <span class="tm-ticket continuous" [class]="'tm-ticket continuous card-tier-' + denom">
+                  <sf-symbol name="ticket" [size]="13" />
+                  Ticket de {{ '$' + denom }} MXN
+                </span>
+              }
+            </div>
+          </div>
+
+          <div class="specs-list continuous">
+            @for (spec of prod.specs; track spec) {
+              <div class="spec-item">
+                <sf-symbol name="checkmark.circle.fill" [size]="16" />
+                <span>{{ spec }}</span>
+              </div>
+            }
+            <div class="spec-item">
+              <sf-symbol name="shield.checkered" [size]="16" />
+              <span>Vendido por <strong>{{ prod.sellerName }}</strong> · Validación automática Banco Central</span>
+            </div>
+          </div>
+
+          <div class="detail-cta-row">
+            <div class="detail-price">
+              <span>Total</span>
+              <strong>{{ prod.price | currency: 'MXN' : 'symbol-narrow' }} <small>MXN</small></strong>
+            </div>
+            <div class="detail-btns">
+              <button
+                type="button"
+                class="btn-secondary continuous apple-pressable"
+                (click)="addToBag(prod); selectedProduct.set(null)"
+              >
+                Agregar a la Bolsa
+              </button>
+              <button
+                type="button"
+                class="btn-primary continuous apple-pressable"
+                (click)="buyNowWithTicket(prod); selectedProduct.set(null)"
+              >
+                <sf-symbol name="wallet.pass" [size]="18" />
+                <span>Pagar con Ticket</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
