@@ -158,7 +158,7 @@ type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
 
             <!-- Poder de compra WalletPay -->
             <div class="nfs-group">
-              <div class="nfs-group-title">PODER DE COMPRA WALLETPAY</div>
+              <div class="nfs-group-title">TOTAL EN TU WALLETPAY</div>
               <button
                 type="button"
                 class="nfs-afford-toggle continuous apple-pressable"
@@ -242,81 +242,61 @@ type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'rating';
            4. CUADRÍCULA DE PRODUCTOS (DISPOSICIÓN 1:1 CON LA IMAGEN ADJUNTADA:
               2 COLUMNAS EN MÓVIL / 4 EN ESCRITORIO, IMAGEN + LÍNEA + TÍTULO + PRECIO + BOTÓN [+])
            ========================================================================== -->
-      @if (filteredProducts().length === 0) {
-        <div class="ne-empty-state continuous">
-          <img src="assets/logos/marketstore-icon.png" alt="Market Store" class="nes-logo" />
-          @if (market.products().length === 0) {
-            <h3>El catálogo está vacío</h3>
-            <p>Sube imágenes de tus productos y publícalos para que aparezcan en el catálogo de Market Store.</p>
-            <button type="button" class="btn-primary continuous apple-pressable" (click)="goToPublishProduct()">
-              <sf-symbol name="plus" [size]="16" [weight]="2.6" />
-              <span>Subir Imágenes y Publicar Producto</span>
-            </button>
-          } @else {
-            <h3>No encontramos artículos con esos filtros</h3>
-            <p>Prueba seleccionando otra categoría o restablece los filtros activos.</p>
-            <button type="button" class="btn-primary continuous apple-pressable" (click)="resetFilters()">
-              Mostrar todos los productos
-            </button>
-          }
-        </div>
-      } @else {
-        <section class="ne-product-grid" [class.single-col]="gridMode() === 'single'">
-          @for (p of filteredProducts(); track p.id) {
-            <article class="ne-card continuous">
-              <!-- Contenedor visual del producto con imagen real subida o icono + sello en esquina superior derecha -->
-              <div
-                class="ne-card-visual continuous apple-pressable"
-                [class]="'ne-card-visual continuous apple-pressable ' + p.surfaceClass"
-                (click)="openDetail(p)"
-              >
-                @if (p.imageUrl) {
-                  <img [src]="p.imageUrl" [alt]="p.title" class="ne-card-img" />
-                } @else {
-                  <div class="ne-card-glyph" [style.color]="p.accentColor">
-                    <sf-symbol [name]="p.symbolName" [size]="52" [weight]="1.55" />
-                  </div>
-                }
-
-                <span class="ne-corner-seal" title="Ver detalle del producto">
-                  <img src="assets/logos/marketstore-icon.png" alt="Market Store" />
-                </span>
-              </div>
-
-              <!-- Línea divisoria horizontal estilo New Era MX (debajo del producto) -->
-              <div class="ne-card-Rule" aria-hidden="true">
-                <span class="ne-card-rule-active"></span>
-              </div>
-
-              <!-- Cuerpo de tarjeta: Etiqueta superior + Título + Fila inferior (Precio a la izquierda y botón [+] a la derecha) -->
-              <div class="ne-card-info">
-                <span class="ne-card-eyebrow">{{ p.badge || p.categoryLabel }}</span>
-
-                <h3 class="ne-card-title" (click)="openDetail(p)">
-                  {{ p.title }}
-                </h3>
-
-                <div class="ne-card-bottom">
-                  <strong class="ne-card-price">
-                    {{ p.price | currency: 'MXN' : 'symbol-narrow' }}
-                  </strong>
-
-                  <button
-                    type="button"
-                    class="ne-plus-btn continuous apple-pressable"
-                    [disabled]="p.stock <= 0"
-                    (click)="buyNowWithTicket(p)"
-                    [attr.aria-label]="'Agregar ' + p.title + ' a la bolsa'"
-                    title="Canjear o agregar a la bolsa"
-                  >
-                    <sf-symbol name="plus" [size]="15" [weight]="2.4" />
-                  </button>
+      <section class="ne-product-grid" [class.single-col]="gridMode() === 'single'">
+        @for (p of filteredProducts(); track p.id) {
+          <article class="ne-card continuous">
+            <!-- Contenedor visual del producto con imagen real subida o icono + sello en esquina superior derecha -->
+            <div
+              class="ne-card-visual continuous apple-pressable"
+              [class]="'ne-card-visual continuous apple-pressable ' + p.surfaceClass"
+              (click)="openDetail(p)"
+            >
+              @if (p.imageUrl) {
+                <img [src]="p.imageUrl" [alt]="p.title" class="ne-card-img" loading="lazy" />
+              } @else {
+                <div class="ne-card-glyph" [style.color]="p.accentColor">
+                  <sf-symbol [name]="p.symbolName" [size]="52" [weight]="1.55" />
                 </div>
+              }
+
+              <span class="ne-corner-seal" title="Ver detalle del producto">
+                <img src="assets/logos/marketstore-icon.png" alt="Market Store" />
+              </span>
+            </div>
+
+            <!-- Línea divisoria horizontal estilo New Era MX (debajo del producto) -->
+            <div class="ne-card-Rule" aria-hidden="true">
+              <span class="ne-card-rule-active"></span>
+            </div>
+
+            <!-- Cuerpo de tarjeta: Etiqueta superior + Título + Fila inferior (Precio a la izquierda y botón [+] a la derecha) -->
+            <div class="ne-card-info">
+              <span class="ne-card-eyebrow">{{ p.badge || p.categoryLabel }}</span>
+
+              <h3 class="ne-card-title" (click)="openDetail(p)">
+                {{ p.title }}
+              </h3>
+
+              <div class="ne-card-bottom">
+                <strong class="ne-card-price">
+                  {{ p.price | currency: 'MXN' : 'symbol-narrow' }}
+                </strong>
+
+                <button
+                  type="button"
+                  class="ne-plus-btn continuous apple-pressable"
+                  [disabled]="p.stock <= 0"
+                  (click)="buyNowWithTicket(p)"
+                  [attr.aria-label]="'Agregar ' + p.title + ' a la bolsa'"
+                  title="Canjear o agregar a la bolsa"
+                >
+                  <sf-symbol name="plus" [size]="15" [weight]="2.4" />
+                </button>
               </div>
-            </article>
-          }
-        </section>
-      }
+            </div>
+          </article>
+        }
+      </section>
 
       <!-- ==========================================================================
            5. FOOTER COMPACTO CON LAS 2 VARIANTES DEL LOGO DE MARKET STORE

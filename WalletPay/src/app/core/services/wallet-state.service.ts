@@ -562,8 +562,10 @@ export class WalletStateService {
     amount: TicketDenomination,
     paymentMethod: string,
     onProgress?: (statusText: string, requestId?: string) => void,
-    shouldCancel?: () => boolean
-  ): Promise<{ ok: boolean; ticket?: BankTicket; requestId?: string; error?: string }> {
+    shouldCancel?: () => boolean,
+    quantity = 1
+  ): Promise<{ ok: boolean; ticket?: BankTicket; quantity?: number; requestId?: string; error?: string }> {
+    const qty = Math.max(1, Math.min(50, Math.floor(quantity || 1)));
     this.resetInactivityWatchdog();
     await this.triggerBiometricPulse('Enviando pago al Banco Central...', 800);
 
@@ -571,6 +573,7 @@ export class WalletStateService {
     try {
       const data = await this.crypto.request('tickets.purchase.request', {
         amount,
+        quantity: qty,
         paymentMethod
       });
 
@@ -655,15 +658,21 @@ export class WalletStateService {
             };
           }
 
-          await this.triggerBiometricPulse(`Ticket $${amount} Aprobado`, 800);
+          await this.triggerBiometricPulse(
+            qty > 1 ? `${qty} Tickets $${amount} Aprobados` : `Ticket $${amount} Aprobado`,
+            800
+          );
           await this.syncWithCentralBank();
           this.addAuditLog(
             'bank',
-            `[Pago Aprobado] Solicitud #${requestId} autorizada (${statusData.bankAuthCode}). Ticket ${minted.id} ($${amount} MXN) emitido.`
+            qty > 1
+              ? `[Pago Aprobado] Solicitud #${requestId} autorizada (${statusData.bankAuthCode}). ${qty} tickets de $${amount} MXN emitidos.`
+              : `[Pago Aprobado] Solicitud #${requestId} autorizada (${statusData.bankAuthCode}). Ticket ${minted.id} ($${amount} MXN) emitido.`
           );
           return {
             ok: true,
             requestId,
+            quantity: qty,
             ticket: minted
           };
         }

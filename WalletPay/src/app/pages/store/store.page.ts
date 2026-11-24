@@ -250,10 +250,21 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                     </span>
                     <span class="emv-mini"></span>
                   </div>
-                  <span class="sheet-card-amount"><span class="cur">$</span>{{ d.amount }}<small>.00</small></span>
+                  <span class="sheet-card-amount">
+                    @if (ticketQuantity() > 1) {
+                      <small style="font-size: 16px; opacity: 0.9; margin-right: 4px;">{{ ticketQuantity() }}×</small>
+                    }
+                    <span class="cur">$</span>{{ d.amount }}<small>.00</small>
+                  </span>
                   <div class="sc-bottom">
                     <span>Ticket {{ d.tier }} · MXN</span>
-                    <span class="sc-code">{{ d.code }}</span>
+                    <span class="sc-code">
+                      @if (ticketQuantity() > 1) {
+                        TOTAL {{ d.amount * ticketQuantity() | currency: 'MXN' : 'symbol-narrow' }}
+                      } @else {
+                        {{ d.code }}
+                      }
+                    </span>
                   </div>
                 </div>
               }
@@ -262,7 +273,13 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                 <div class="done">
                   <sf-symbol class="done-icon" name="checkmark.circle.fill" [size]="56" />
                   <strong>Pago Aprobado por el Banco Central</strong>
-                  <span>El Administrador autorizó tu tarjeta y el ticket se guardó en Mis Tickets.</span>
+                  <span>
+                    @if (ticketQuantity() > 1) {
+                      El Administrador autorizó tu tarjeta y los {{ ticketQuantity() }} tickets de {{ d.amount | currency: 'MXN' : 'symbol-narrow' }} se guardaron en Mis Tickets.
+                    } @else {
+                      El Administrador autorizó tu tarjeta y el ticket se guardó en Mis Tickets.
+                    }
+                  </span>
                 </div>
               } @else if (state() === 'waiting_approval') {
                 <div class="waiting-box continuous">
@@ -451,10 +468,54 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                   </ion-item>
                 </ion-list>
 
+                <div class="qty-selector-card continuous">
+                  <div class="qty-top">
+                    <div class="qty-info">
+                      <strong>Cantidad de tickets</strong>
+                      <span>Denominación de {{ d.amount | currency: 'MXN' : 'symbol-narrow' }} c/u</span>
+                    </div>
+                    <div class="qty-stepper">
+                      <button
+                        type="button"
+                        class="qty-step-btn apple-pressable"
+                        [disabled]="ticketQuantity() <= 1"
+                        (click)="adjustQuantity(-1)"
+                        aria-label="Disminuir cantidad"
+                      >
+                        <sf-symbol name="minus" [size]="14" [weight]="2.8" />
+                      </button>
+                      <span class="qty-value mono">{{ ticketQuantity() }}</span>
+                      <button
+                        type="button"
+                        class="qty-step-btn apple-pressable"
+                        [disabled]="ticketQuantity() >= 50"
+                        (click)="adjustQuantity(1)"
+                        aria-label="Aumentar cantidad"
+                      >
+                        <sf-symbol name="plus" [size]="14" [weight]="2.8" />
+                      </button>
+                    </div>
+                  </div>
+                  <div class="qty-quick-pills">
+                    @for (q of quickQuantities; track q) {
+                      <button
+                        type="button"
+                        class="qty-pill apple-pressable"
+                        [class.active]="ticketQuantity() === q"
+                        (click)="setQuantity(q)"
+                      >
+                        {{ q }} {{ q === 1 ? 'ticket' : 'tickets' }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
                 <ion-list [inset]="true">
                   <ion-item>
-                    <ion-label>Ticket {{ d.tier }}</ion-label>
-                    <ion-note slot="end">{{ d.amount | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
+                    <ion-label>
+                      {{ ticketQuantity() }}× Ticket {{ d.tier }} ({{ d.amount | currency: 'MXN' : 'symbol-narrow' }})
+                    </ion-label>
+                    <ion-note slot="end">{{ d.amount * ticketQuantity() | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
                   </ion-item>
                   <ion-item>
                     <ion-label>Validación Bancaria</ion-label>
@@ -462,7 +523,7 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
                   </ion-item>
                   <ion-item lines="none">
                     <ion-label><strong>Total a autorizar</strong></ion-label>
-                    <ion-note slot="end" class="total">{{ d.amount | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
+                    <ion-note slot="end" class="total">{{ d.amount * ticketQuantity() | currency: 'MXN' : 'symbol-narrow' }}</ion-note>
                   </ion-item>
                 </ion-list>
 
@@ -1232,6 +1293,87 @@ type SheetState = 'idle' | 'adding_card' | 'waiting_approval' | 'done' | 'reject
       align-items: center;
       justify-content: center;
     }
+    .qty-selector-card {
+      --r: 16px;
+      margin: 0 16px 12px;
+      padding: 12px 14px;
+      background: var(--ios-cell);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .qty-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .qty-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .qty-info strong {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--ios-label);
+    }
+    .qty-info span {
+      font-size: 12px;
+      color: var(--ios-label-2);
+    }
+    .qty-stepper {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--ios-sheet-cell, rgba(120, 120, 128, 0.16));
+      padding: 4px;
+      border-radius: 12px;
+    }
+    .qty-step-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      border: 0;
+      background: var(--ios-cell);
+      color: var(--ion-color-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+    .qty-step-btn:disabled {
+      opacity: 0.35;
+    }
+    .qty-value {
+      min-width: 30px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ios-label);
+    }
+    .qty-quick-pills {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .qty-pill {
+      height: 28px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 0.5px solid var(--ios-separator);
+      background: var(--ios-sheet-cell, rgba(120, 120, 128, 0.12));
+      color: var(--ios-label-2);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+    }
+    .qty-pill.active {
+      background: var(--ion-color-primary);
+      color: #fff;
+      border-color: var(--ion-color-primary);
+    }
   `]
 })
 export class StorePage {
@@ -1298,6 +1440,8 @@ export class StorePage {
 
   readonly sheetOpen = signal(false);
   readonly selected = signal<Denomination | null>(null);
+  readonly ticketQuantity = signal<number>(1);
+  readonly quickQuantities = [1, 2, 3, 5, 10];
   readonly payment = signal('');
   readonly state = signal<SheetState>('idle');
   readonly approvalProgressText = signal('Enviando solicitud de pago al Banco Central...');
@@ -1305,7 +1449,26 @@ export class StorePage {
   readonly rejectionReason = signal('');
   private cancelWaitingFlag = false;
 
-  readonly payLabel = computed(() => 'Realizar Pago');
+  readonly payLabel = computed(() => {
+    const d = this.selected();
+    const qty = this.ticketQuantity();
+    if (!d) return 'Realizar Pago';
+    return qty > 1
+      ? `Autorizar ${qty} tickets ($${d.amount * qty}.00 MXN)`
+      : `Realizar Pago ($${d.amount}.00 MXN)`;
+  });
+
+  setQuantity(qty: number): void {
+    const clean = Math.max(1, Math.min(50, Math.floor(qty || 1)));
+    if (this.ticketQuantity() !== clean) {
+      this.wallet.haptic('selection');
+      this.ticketQuantity.set(clean);
+    }
+  }
+
+  adjustQuantity(delta: number): void {
+    this.setQuantity(this.ticketQuantity() + delta);
+  }
 
   previewCardBrand(): { name: string; tint: string; gradient: string } {
     const digits = this.newCardNumber.replace(/\D/g, '');
@@ -1428,6 +1591,7 @@ export class StorePage {
   open(d: Denomination): void {
     this.wallet.haptic('light');
     this.selected.set(d);
+    this.ticketQuantity.set(1);
     this.cancelWaitingFlag = false;
     const saved = this.wallet.savedUserCards();
     if (saved.length === 0) {
@@ -1477,7 +1641,8 @@ export class StorePage {
         this.approvalProgressText.set(progressMsg);
         if (reqId) this.currentRequestId.set(reqId);
       },
-      () => this.cancelWaitingFlag
+      () => this.cancelWaitingFlag,
+      this.ticketQuantity()
     );
 
     if (this.cancelWaitingFlag) return;

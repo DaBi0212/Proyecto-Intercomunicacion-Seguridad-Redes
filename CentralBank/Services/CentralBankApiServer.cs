@@ -944,6 +944,7 @@ public class CentralBankApiServer : IDisposable
                 }
 
                 var amount = GetIntProp(payload, "amount", 0);
+                var quantity = Math.Clamp(GetIntProp(payload, "quantity", 1), 1, 50);
                 var paymentMethod = GetStringProp(payload, "paymentMethod", "Tarjeta de Débito/Crédito");
 
                 if (!CentralBankStateService.AllowedDenominations.Contains(amount))
@@ -958,13 +959,15 @@ public class CentralBankApiServer : IDisposable
                 }
 
                 // Toda compra de ticket pasa por la validación y aprobación de tarjeta del Administrador del Banco Central
-                var pendingReq = _state.CreatePendingTicketPurchaseRequest(session.UserEmail, amount, paymentMethod);
+                var pendingReq = _state.CreatePendingTicketPurchaseRequest(session.UserEmail, amount, paymentMethod, quantity);
 
                 return (200, new
                 {
                     ok = true,
                     pendingApproval = true,
                     requestId = pendingReq.RequestId,
+                    quantity = pendingReq.Quantity,
+                    totalAmount = pendingReq.TotalAmount,
                     approvalStatus = pendingReq.ApprovalStatus,
                     request = MapTicketRequestForFrontend(pendingReq),
                     message = "Solicitud enviada al Banco Central. Esperando aprobación del pago con tarjeta por el Administrador."
@@ -987,9 +990,17 @@ public class CentralBankApiServer : IDisposable
                     return (404, new { ok = false, code = "REQUEST_NOT_FOUND", error = "Solicitud de compra de ticket no encontrada." });
                 }
 
-                var mintedTicket = !string.IsNullOrEmpty(req.MintedTicketId)
-                    ? _state.Tickets.FirstOrDefault(t => t.Id == req.MintedTicketId)
-                    : null;
+                var mintedIds = !string.IsNullOrEmpty(req.MintedTicketId)
+                    ? req.MintedTicketId.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    : Array.Empty<string>();
+
+                var mintedTickets = mintedIds
+                    .Select(id => _state.Tickets.FirstOrDefault(t => t.Id == id))
+                    .Where(t => t != null)
+                    .Cast<BankTicketRecord>()
+                    .ToList();
+
+                var mintedTicket = mintedTickets.FirstOrDefault();
 
                 var createdTx = mintedTicket != null
                     ? _state.Transactions.FirstOrDefault(tx => tx.Id == mintedTicket.PurchaseTransactionId)
@@ -999,12 +1010,15 @@ public class CentralBankApiServer : IDisposable
                 {
                     ok = true,
                     requestId = req.RequestId,
+                    quantity = req.Quantity,
+                    totalAmount = req.TotalAmount,
                     approvalStatus = req.ApprovalStatus,
                     statusReport = req.StatusReport,
                     bankAuthCode = req.BankAuthCode,
                     mintedTicketId = req.MintedTicketId,
                     request = MapTicketRequestForFrontend(req),
                     ticket = mintedTicket != null ? MapTicketForFrontend(mintedTicket, session.UserEmail) : null,
+                    tickets = mintedTickets.Select(t => MapTicketForFrontend(t, session.UserEmail)).ToList(),
                     transaction = createdTx != null ? MapTxForWalletPay(createdTx) : null
                 });
             }
@@ -1326,6 +1340,8 @@ public class CentralBankApiServer : IDisposable
     {
         requestId = r.RequestId,
         amount = r.Amount,
+        quantity = r.Quantity,
+        totalAmount = r.TotalAmount,
         tier = r.Tier,
         colorClass = r.ColorClass,
         paymentMethod = r.PaymentMethod,

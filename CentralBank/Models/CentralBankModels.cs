@@ -125,6 +125,8 @@ public class PendingTicketPurchaseRecord
     public string UserAvatarHex { get; set; } = "#007AFF";
 
     public int Amount { get; set; }
+    public int Quantity { get; set; } = 1;
+    public int TotalAmount => Amount * Math.Max(1, Quantity);
     public string Tier { get; set; } = string.Empty;
     public string ColorClass { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
@@ -143,14 +145,22 @@ public class PendingTicketPurchaseRecord
     public bool IsApproved => ApprovalStatus == "approved";
     public bool IsRejected => ApprovalStatus == "rejected";
 
-    public string AmountFormatted => $"${Amount:N2} MXN";
-    public string TicketTitle => $"Ticket {Tier} de ${Amount:N0}.00 MXN";
+    public string AmountFormatted => Quantity > 1
+        ? $"${TotalAmount:N2} MXN ({Quantity}× ${Amount:N0})"
+        : $"${Amount:N2} MXN";
+    public string TicketTitle => Quantity > 1
+        ? $"{Quantity}× Ticket {Tier} de ${Amount:N0}.00 MXN"
+        : $"Ticket {Tier} de ${Amount:N0}.00 MXN";
     public string TimestampFull => $"{CreatedDate} · {CreatedTime}";
     public string StatusPillText => ApprovalStatus switch
     {
-        "approved" => $"PAGO APROBADO · TICKET {MintedTicketId}",
+        "approved" => Quantity > 1
+            ? $"PAGO APROBADO · {Quantity} TICKETS ({MintedTicketId})"
+            : $"PAGO APROBADO · TICKET {MintedTicketId}",
         "rejected" => "PAGO DE TARJETA RECHAZADO",
-        _ => "VALIDACIÓN DE TARJETA PENDIENTE"
+        _ => Quantity > 1
+            ? $"VALIDACIÓN DE TARJETA PENDIENTE ({Quantity} TICKETS)"
+            : "VALIDACIÓN DE TARJETA PENDIENTE"
     };
 }
 

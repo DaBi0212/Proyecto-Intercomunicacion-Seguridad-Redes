@@ -248,6 +248,7 @@ public class CentralBankStateService
                     value TEXT NOT NULL
                 );";
             extra.ExecuteNonQuery();
+            TryAlterColumn(conn, "ALTER TABLE ticket_requests ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;");
         }
     }
 
@@ -535,7 +536,8 @@ public class CentralBankStateService
                 cmd.CommandText = @"
                     SELECT request_id, user_id, user_name, user_email, user_initials, user_avatar_hex,
                            amount, tier, color_class, payment_method, created_date, created_time,
-                           approval_status, minted_ticket_id, bank_auth_code, status_report, created_epoch
+                           approval_status, minted_ticket_id, bank_auth_code, status_report, created_epoch,
+                           quantity
                     FROM ticket_requests
                     ORDER BY created_epoch DESC;";
                 using var r = cmd.ExecuteReader();
@@ -559,7 +561,8 @@ public class CentralBankStateService
                         MintedTicketId = r.IsDBNull(13) ? null : r.GetString(13),
                         BankAuthCode = r.GetString(14),
                         StatusReport = r.GetString(15),
-                        CreatedEpoch = r.GetInt64(16)
+                        CreatedEpoch = r.GetInt64(16),
+                        Quantity = r.FieldCount > 17 && !r.IsDBNull(17) ? Math.Max(1, r.GetInt32(17)) : 1
                     });
                 }
             }
@@ -1110,12 +1113,14 @@ public class CentralBankStateService
     // VALIDACIÓN DE TARJETA / PAGO PARA COMPRA DE TICKETS (APROBACIÓN BANCARIA)
     // =========================================================================
 
-    public PendingTicketPurchaseRecord CreatePendingTicketPurchaseRequest(string userEmail, int denomination, string paymentMethod)
+    public PendingTicketPurchaseRecord CreatePendingTicketPurchaseRequest(string userEmail, int denomination, string paymentMethod, int quantity = 1)
     {
         if (!AllowedDenominations.Contains(denomination))
         {
             throw new InvalidOperationException("Denominación no permitida. Solo se emiten tickets de $50, $100, $200 o $500.");
         }
+
+        quantity = Math.Clamp(quantity, 1, 50);
 
         ReloadFromDatabase();
         var user = FindUser(userEmail) ?? throw new InvalidOperationException("Cuenta no encontrada.");
@@ -1140,6 +1145,7 @@ public class CentralBankStateService
         var dateStr = now.ToString("dd MMM yyyy");
         var timeStr = now.ToString("HH:mm:ss 'hrs'");
         var epoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var totalAmount = denomination * quantity;
 
         lock (_dbLock)
         {
@@ -1149,11 +1155,11 @@ public class CentralBankStateService
             cmd.CommandText = @"
                 INSERT INTO ticket_requests (
                     request_id, user_id, user_name, user_email, user_initials, user_avatar_hex,
-                    amount, tier, color_class, payment_method, created_date, created_time,
+                    amount, quantity, tier, color_class, payment_method, created_date, created_time,
                     approval_status, minted_ticket_id, bank_auth_code, status_report, created_epoch
                 ) VALUES (
                     $rid, $uid, $uname, $uemail, $uinit, $uhex,
-                    $amt, $tier, $cls, $method, $cdate, $ctime,
+                    $amt, $qty, $tier, $cls, $method, $cdate, $ctime,
                     'pending', NULL, 'PENDIENTE',
                     'Solicitud de compra de ticket recibida. Esperando que el Administrador del Banco valide y apruebe el pago con tarjeta.',
                     $epoch
@@ -1165,6 +1171,7 @@ public class CentralBankStateService
             cmd.Parameters.AddWithValue("$uinit", user.AvatarInitials);
             cmd.Parameters.AddWithValue("$uhex", user.AvatarHex);
             cmd.Parameters.AddWithValue("$amt", denomination);
+            cmd.Parameters.AddWithValue("$qty", quantity);
             cmd.Parameters.AddWithValue("$tier", tierName);
             cmd.Parameters.AddWithValue("$cls", colorClass);
             cmd.Parameters.AddWithValue("$method", paymentMethod);
@@ -1174,16 +1181,17 @@ public class CentralBankStateService
             cmd.ExecuteNonQuery();
         }
 
+        var qtyLabel = quantity > 1 ? $"{quantity}× Ticket {tierName} de ${denomination} MXN (Total: ${totalAmount} MXN)" : $"Ticket {tierName} de ${denomination} MXN";
         AddAuditLog(
             "CARD-REQ",
             "#FF9500",
-            $"[Validación de Tarjeta] {user.Name} ({user.Email}) solicitó comprar Ticket {tierName} de ${denomination} MXN vía {paymentMethod} (#{requestId}). Esperando aprobación del Administrador."
+            $"[Validación de Tarjeta] {user.Name} ({user.Email}) solicitó comprar {qtyLabel} vía {paymentMethod} (#{requestId}). Esperando aprobación del Administrador."
         );
 
         ReloadFromDatabase();
         var record = TicketRequests.First(r => r.RequestId == requestId);
         PendingTicketRequestCreated?.Invoke(record);
-        NotifyStateChanged($"¡Nueva solicitud de compra de Ticket (${denomination} MXN) #{requestId} espera aprobación bancaria!");
+        NotifyStateChanged($"¡Nueva solicitud de compra ({qtyLabel}) #{requestId} espera aprobación bancaria!");
         return record;
     }
 
@@ -1196,7 +1204,8 @@ public class CentralBankStateService
             if (req == null) return (false, "Solicitud no encontrada.", null);
             if (req.IsApproved)
             {
-                var existingTk = Tickets.FirstOrDefault(t => t.Id == req.MintedTicketId);
+                var firstId = req.MintedTicketId?.Split(',')[0].Trim();
+                var existingTk = Tickets.FirstOrDefault(t => t.Id == firstId);
                 return (false, "Otro administrador ya aprobó esta solicitud.", existingTk);
             }
             if (req.IsRejected) return (false, "Otro administrador ya rechazó esta solicitud.", null);
@@ -1212,10 +1221,14 @@ public class CentralBankStateService
                     : "Otro administrador ya está procesando o aprobó esta solicitud.", null);
             }
 
-            BankTicketRecord minted;
+            var qty = Math.Clamp(req.Quantity, 1, 50);
+            var mintedList = new List<BankTicketRecord>(qty);
             try
             {
-                minted = PurchaseTicketForUser(req.UserEmail, req.Amount, req.PaymentMethod);
+                for (var i = 0; i < qty; i++)
+                {
+                    mintedList.Add(PurchaseTicketForUser(req.UserEmail, req.Amount, req.PaymentMethod));
+                }
             }
             catch (Exception ex)
             {
@@ -1223,8 +1236,12 @@ public class CentralBankStateService
                 return (false, $"No se pudo emitir el ticket: {ex.Message}", null);
             }
 
+            var firstMinted = mintedList[0];
+            var allMintedIdsCsv = string.Join(", ", mintedList.Select(t => t.Id));
             var authCode = $"CARD-OK-{SecurityService.NewInt(10000, 100000)}";
-            var report = $"Pago con tarjeta ({req.PaymentMethod}) validado y aprobado por el Administrador ({authCode}). Ticket {minted.Id} emitido.";
+            var report = qty > 1
+                ? $"Pago con tarjeta ({req.PaymentMethod}) por ${req.TotalAmount:N2} MXN validado y aprobado por el Administrador ({authCode}). {qty} tickets emitidos ({allMintedIdsCsv})."
+                : $"Pago con tarjeta ({req.PaymentMethod}) validado y aprobado por el Administrador ({authCode}). Ticket {firstMinted.Id} emitido.";
 
             lock (_dbLock)
             {
@@ -1238,7 +1255,7 @@ public class CentralBankStateService
                         bank_auth_code = $code,
                         status_report = $rep
                     WHERE request_id = $rid AND approval_status = 'processing';";
-                cmd.Parameters.AddWithValue("$tid", minted.Id);
+                cmd.Parameters.AddWithValue("$tid", allMintedIdsCsv);
                 cmd.Parameters.AddWithValue("$code", authCode);
                 cmd.Parameters.AddWithValue("$rep", report);
                 cmd.Parameters.AddWithValue("$rid", req.RequestId);
@@ -1248,12 +1265,16 @@ public class CentralBankStateService
             AddAuditLog(
                 "CARD-OK",
                 "#34C759",
-                $"[Pago de Tarjeta Aprobado] Solicitud #{req.RequestId} de {req.UserName} por ${req.Amount} MXN aprobada ({authCode}). Ticket {minted.Id} emitido a su bóveda."
+                qty > 1
+                    ? $"[Pago de Tarjeta Aprobado] Solicitud #{req.RequestId} de {req.UserName} por ${req.TotalAmount} MXN ({qty}× ${req.Amount}) aprobada ({authCode}). Tickets emitidos: {allMintedIdsCsv}."
+                    : $"[Pago de Tarjeta Aprobado] Solicitud #{req.RequestId} de {req.UserName} por ${req.Amount} MXN aprobada ({authCode}). Ticket {firstMinted.Id} emitido a su bóveda."
             );
 
             ReloadFromDatabase();
-            NotifyStateChanged($"Pago de tarjeta aprobado (#{req.RequestId}) · Ticket {minted.Id} (${req.Amount} MXN) emitido");
-            return (true, authCode, minted);
+            NotifyStateChanged(qty > 1
+                ? $"Pago aprobado (#{req.RequestId}) · {qty} tickets de ${req.Amount} MXN emitidos"
+                : $"Pago de tarjeta aprobado (#{req.RequestId}) · Ticket {firstMinted.Id} (${req.Amount} MXN) emitido");
+            return (true, authCode, firstMinted);
         }
     }
 

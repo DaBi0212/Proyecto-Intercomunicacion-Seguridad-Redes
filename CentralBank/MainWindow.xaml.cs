@@ -38,6 +38,9 @@ public partial class MainWindow : Window
         catch { }
 
         InitializeComponent();
+        AdaptWindowToComputerScreen();
+        SizeChanged += (_, _) => UpdateResponsiveWindowScale();
+        Loaded += (_, _) => UpdateResponsiveWindowScale();
 
         try
         {
@@ -172,6 +175,48 @@ public partial class MainWindow : Window
             ? Title[..Title.LastIndexOf(marker, StringComparison.Ordinal)]
             : Title;
         Title = baseTitle + marker + (isPrimary ? "Consola principal" : "Administrador adicional");
+    }
+
+    /// <summary>
+    /// Redimensiona y ajusta automáticamente la ventana de CentralBank a las dimensiones
+    /// reales y escala DPI del monitor/computador donde se abra.
+    /// </summary>
+    private void AdaptWindowToComputerScreen()
+    {
+        try
+        {
+            var workArea = SystemParameters.WorkArea;
+            var targetWidth = Math.Min(1420.0, Math.Max(820.0, workArea.Width * 0.96));
+            var targetHeight = Math.Min(900.0, Math.Max(560.0, workArea.Height * 0.94));
+
+            MinWidth = Math.Min(800.0, workArea.Width * 0.75);
+            MinHeight = Math.Min(540.0, workArea.Height * 0.75);
+            Width = targetWidth;
+            Height = targetHeight;
+            Left = workArea.Left + (workArea.Width - targetWidth) / 2.0;
+            Top = workArea.Top + (workArea.Height - targetHeight) / 2.0;
+            WindowState = WindowState.Maximized;
+        }
+        catch { }
+    }
+
+    private void UpdateResponsiveWindowScale()
+    {
+        try
+        {
+            if (MainDashboardGrid == null) return;
+            var effectiveWidth = ActualWidth > 100 ? ActualWidth : (Width > 100 ? Width : SystemParameters.WorkArea.Width);
+            var effectiveHeight = ActualHeight > 100 ? ActualHeight : (Height > 100 ? Height : SystemParameters.WorkArea.Height);
+
+            var scaleX = effectiveWidth < 1340.0 ? effectiveWidth / 1340.0 : 1.0;
+            var scaleY = effectiveHeight < 800.0 ? effectiveHeight / 800.0 : 1.0;
+            var scale = Math.Clamp(Math.Min(scaleX, scaleY), 0.65, 1.0);
+
+            MainDashboardGrid.LayoutTransform = Math.Abs(scale - 1.0) < 0.01
+                ? Transform.Identity
+                : new ScaleTransform(scale, scale);
+        }
+        catch { }
     }
 
     /// <summary>Huella del estado compartido para detectar cambios hechos por cualquier administrador.</summary>
